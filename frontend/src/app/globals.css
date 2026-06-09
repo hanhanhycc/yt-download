@@ -1,0 +1,144 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-0: #07070c;
+  --fg: #e9eaf2;
+  --brand: #7c5cff;
+  --brand-2: #22d3ee;
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html, body {
+  background: var(--bg-0);
+  color: var(--fg);
+}
+
+body {
+  background-image:
+    radial-gradient(ellipse 80% 50% at 20% -10%, rgba(124, 92, 255, 0.25), transparent 60%),
+    radial-gradient(ellipse 60% 40% at 90% 10%, rgba(34, 211, 238, 0.18), transparent 60%),
+    radial-gradient(ellipse 70% 50% at 50% 100%, rgba(124, 92, 255, 0.12), transparent 70%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+/* Subtle grid overlay */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none;
+  z-index: 0;
+  -webkit-mask-image: radial-gradient(ellipse at center, rgba(0,0,0,0.55), transparent 75%);
+          mask-image: radial-gradient(ellipse at center, rgba(0,0,0,0.55), transparent 75%);
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200 select-none;
+  }
+  .btn-primary {
+    @apply btn text-white shadow-lg disabled:opacity-40 disabled:cursor-not-allowed;
+    background: linear-gradient(135deg, #7c5cff 0%, #5b3df5 100%);
+    box-shadow: 0 6px 20px -6px rgba(124, 92, 255, 0.6);
+  }
+  .btn-primary:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 30px -5px rgba(124, 92, 255, 0.6);
+  }
+  .btn-primary:active:not(:disabled) { transform: translateY(0); }
+  .btn-ghost {
+    @apply btn bg-white/[0.04] hover:bg-white/[0.08] text-white border border-white/10;
+  }
+  .btn-icon {
+    @apply inline-flex items-center justify-center w-9 h-9 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition;
+  }
+
+  .input {
+    @apply w-full rounded-xl bg-white/[0.04] border border-white/10 px-4 py-3 text-sm outline-none transition placeholder-white/30;
+  }
+  .input:focus {
+    @apply border-brand/60 bg-white/[0.06];
+    box-shadow: 0 0 0 4px rgba(124, 92, 255, 0.12);
+  }
+
+  .card {
+    @apply relative rounded-2xl border border-white/10 backdrop-blur-xl p-6;
+    background-image: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
+  }
+
+  .label {
+    @apply block text-[11px] font-medium uppercase tracking-[0.12em] text-white/40 mb-2;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-white/70;
+  }
+
+  .pill {
+    @apply inline-flex items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm font-medium text-white/70 transition cursor-pointer hover:border-white/20 hover:bg-white/[0.06];
+  }
+  .pill-active {
+    @apply border-brand/60 bg-brand/10 text-white;
+    box-shadow: 0 0 0 1px rgba(124, 92, 255, 0.25);
+  }
+}
+
+/* Progress shimmer */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.progress-bar {
+  background: linear-gradient(90deg, #7c5cff 0%, #22d3ee 50%, #7c5cff 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2.5s linear infinite;
+  box-shadow: 0 0 18px rgba(124, 92, 255, 0.5);
+}
+
+/* Marquee */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.marquee { animation: marquee 40s linear infinite; }
+.marquee-mask {
+  -webkit-mask-image: linear-gradient(90deg, transparent, black 10%, black 90%, transparent);
+          mask-image: linear-gradient(90deg, transparent, black 10%, black 90%, transparent);
+}
+
+/* Fade in */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up { animation: fadeUp 0.35s ease-out; }
+
+/* Pulse dot */
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.4; transform: scale(0.85); }
+}
+.pulse-dot { animation: pulseDot 1.4s ease-in-out infinite; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
+
+header, main, footer { position: relative; z-index: 1; }
