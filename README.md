@@ -63,8 +63,23 @@ The first boot:
    `ADMIN_PASSWORD`).
 3. Worker connects to Redis and starts consuming the `downloads` queue.
 
-Downloaded files land under `./storage/user_<id>/` on the host
-(mounted to `/data/downloads` inside containers).
+Downloaded files land in the named volume `storage_data` (or under
+`./storage/user_<id>/` if you use the dev override below).
+
+For **local dev with hot-reload**:
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+```
+
+For **NAS / low-resource hosts** (CPU/RAM caps, concurrency=2):
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+For **Coolify**: set Build Pack to **Docker Compose**, point it at
+`docker-compose.yml`, and paste env vars from `.env.example` into the
+Coolify env UI (especially `SECRET_KEY`, `ADMIN_PASSWORD`, `BOT_API_KEY`,
+`PUBLIC_BASE_URL`, `NEXT_PUBLIC_API_BASE_URL`, `CORS_ORIGINS`).
 
 ---
 

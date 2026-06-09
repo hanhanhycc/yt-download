@@ -1,17 +1,20 @@
 version: "3.9"
 
+# Production-ready compose. Works with Coolify, plain `docker compose up -d`,
+# or any host. For local dev with hot-reload, add: -f docker-compose.dev.yml
+
 services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:-ytdl}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ytdl}
+      POSTGRES_DB: ${POSTGRES_DB:-ytdl}
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ytdl} -d ${POSTGRES_DB:-ytdl}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -29,35 +32,79 @@ services:
     build:
       context: ./backend
     restart: unless-stopped
-    env_file: .env
+    environment:
+      # Coolify / docker compose --env-file inject these.
+      PROJECT_NAME: ${PROJECT_NAME:-yt-download}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      SECRET_KEY: ${SECRET_KEY}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
+      ALGORITHM: ${ALGORITHM:-HS256}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-ytdl}:${POSTGRES_PASSWORD:-ytdl}@db:5432/${POSTGRES_DB:-ytdl}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      DOWNLOAD_DIR: /data/downloads
+      MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-2048}
+      JOB_TIMEOUT_SECONDS: ${JOB_TIMEOUT_SECONDS:-3600}
+      DEFAULT_DAILY_JOB_QUOTA: ${DEFAULT_DAILY_JOB_QUOTA:-50}
+      DEFAULT_CONCURRENT_JOBS: ${DEFAULT_CONCURRENT_JOBS:-3}
+      DOWNLOAD_TOKEN_TTL_SECONDS: ${DOWNLOAD_TOKEN_TTL_SECONDS:-86400}
+      ALLOWED_DOMAINS: ${ALLOWED_DOMAINS:-}
+      BLOCKED_DOMAINS: ${BLOCKED_DOMAINS:-localhost,127.0.0.1,0.0.0.0,169.254.169.254}
+      BOT_API_KEY: ${BOT_API_KEY}
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
     volumes:
-      - ./storage:/data
-      - ./backend:/app
+      - storage_data:/data
+    expose:
+      - "8000"
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     command: >
       sh -c "alembic upgrade head &&
-             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   worker:
     build:
       context: ./backend
     restart: unless-stopped
-    env_file: .env
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      SECRET_KEY: ${SECRET_KEY}
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-ytdl}:${POSTGRES_PASSWORD:-ytdl}@db:5432/${POSTGRES_DB:-ytdl}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      DOWNLOAD_DIR: /data/downloads
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
+      MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-2048}
+      JOB_TIMEOUT_SECONDS: ${JOB_TIMEOUT_SECONDS:-3600}
+      DOWNLOAD_TOKEN_TTL_SECONDS: ${DOWNLOAD_TOKEN_TTL_SECONDS:-86400}
+      ALLOWED_DOMAINS: ${ALLOWED_DOMAINS:-}
+      BLOCKED_DOMAINS: ${BLOCKED_DOMAINS:-localhost,127.0.0.1,0.0.0.0,169.254.169.254}
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
     volumes:
-      - ./storage:/data
-      - ./backend:/app
-    command: celery -A app.workers.celery_app.celery worker --loglevel=INFO --concurrency=3
+      - storage_data:/data
+    command: celery -A app.workers.celery_app.celery worker --loglevel=INFO --concurrency=${WORKER_CONCURRENCY:-3}
 
   frontend:
     build:
@@ -65,11 +112,15 @@ services:
       args:
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
     restart: unless-stopped
-    env_file: .env
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
     depends_on:
       - backend
+    expose:
+      - "3000"
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
 
 volumes:
   db_data:
+  storage_data:
