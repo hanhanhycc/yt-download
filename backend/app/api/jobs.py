@@ -31,7 +31,10 @@ router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 def _build_download_url(job: DownloadJob) -> str | None:
     if job.status != JobStatus.COMPLETED or not job.download_token:
         return None
-    return f"{settings.PUBLIC_BASE_URL.rstrip('/')}/api/files/{job.id}?token={job.download_token}"
+    # Relative URL: the browser resolves it against whatever origin it used
+    # (LAN IP or a public domain like yt.pfvn.net), so download links work
+    # from both without depending on PUBLIC_BASE_URL.
+    return f"/api/files/{job.id}?token={job.download_token}"
 
 
 def _serialize(job: DownloadJob) -> JobRead:
