@@ -45,6 +45,7 @@ services:
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_RESET_ON_BOOT: ${ADMIN_RESET_ON_BOOT:-false}
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-ytdl}:${POSTGRES_PASSWORD:-ytdl}@db:5432/${POSTGRES_DB:-ytdl}
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/1
