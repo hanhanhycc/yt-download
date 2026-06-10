@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str = "admin"
     ADMIN_EMAIL: str = "admin@example.com"
+    # When true, the configured admin's password is reset from ADMIN_PASSWORD
+    # on every boot. Use it to recover a lost admin password via env +
+    # redeploy, then set it back to false.
+    ADMIN_RESET_ON_BOOT: bool = False
 
     # Database
     DATABASE_URL: str = "postgresql+psycopg2://ytdl:ytdl@db:5432/ytdl"

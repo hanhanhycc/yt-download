@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import func
 
 from app.api import auth, bot, files, jobs, metadata
 from app.config import settings
@@ -22,21 +23,41 @@ logger = logging.getLogger(__name__)
 
 
 def _bootstrap_admin() -> None:
-    """Create the initial admin user if no users exist."""
+    """Ensure the configured admin user exists.
+
+    - If it does not exist, create it from the ADMIN_* env vars.
+    - If it exists and ADMIN_RESET_ON_BOOT is true, reset its password from
+      ADMIN_PASSWORD. This lets you recover a lost admin password with just
+      env + redeploy, since changing ADMIN_PASSWORD alone never updates an
+      already-created user.
+    """
     db = SessionLocal()
     try:
-        if db.query(User).count() > 0:
-            return
-        admin = User(
-            username=settings.ADMIN_USERNAME,
-            email=settings.ADMIN_EMAIL,
-            hashed_password=hash_password(settings.ADMIN_PASSWORD),
-            is_active=True,
-            is_admin=True,
+        admin = (
+            db.query(User)
+            .filter(func.lower(User.username) == settings.ADMIN_USERNAME.strip().lower())
+            .first()
         )
-        db.add(admin)
-        db.commit()
-        logger.info("Created bootstrap admin user '%s'", settings.ADMIN_USERNAME)
+        if admin is None:
+            admin = User(
+                username=settings.ADMIN_USERNAME,
+                email=settings.ADMIN_EMAIL,
+                hashed_password=hash_password(settings.ADMIN_PASSWORD),
+                is_active=True,
+                is_admin=True,
+            )
+            db.add(admin)
+            db.commit()
+            logger.info("Created bootstrap admin user '%s'", settings.ADMIN_USERNAME)
+        elif settings.ADMIN_RESET_ON_BOOT:
+            admin.hashed_password = hash_password(settings.ADMIN_PASSWORD)
+            admin.is_active = True
+            admin.is_admin = True
+            db.commit()
+            logger.info(
+                "Reset admin password for '%s' (ADMIN_RESET_ON_BOOT=true)",
+                settings.ADMIN_USERNAME,
+            )
     finally:
         db.close()
 
