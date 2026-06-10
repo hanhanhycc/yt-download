@@ -1,18 +1,26 @@
-"""FastAPI application entry point."""
+"""FastAPI application entry point (single-container build).
+
+Serves the REST API and, in production, the statically-exported frontend
+from the same origin. The database schema is created on startup (SQLite,
+no migrations) and downloads run on an in-process thread pool.
+"""
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func
 
 from app.api import auth, bot, files, jobs, metadata
 from app.config import settings
 from app.core.security import hash_password
 from app.core.url_validator import ensure_dir
-from app.database import SessionLocal
+from app.database import Base, SessionLocal, engine
+from app.models import job as _job_model  # noqa: F401  (register tables)
 from app.models.user import User
 
 logging.basicConfig(
@@ -21,15 +29,25 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+WEB_DIR = os.environ.get("WEB_DIR", "/app/web")
+
+
+def _init_db() -> None:
+    # Make sure the SQLite file's directory exists, then create tables.
+    db_url = settings.DATABASE_URL
+    if db_url.startswith("sqlite"):
+        path = db_url.split("sqlite:///", 1)[-1]
+        parent = os.path.dirname(path)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+    Base.metadata.create_all(bind=engine)
+
 
 def _bootstrap_admin() -> None:
     """Ensure the configured admin user exists.
 
-    - If it does not exist, create it from the ADMIN_* env vars.
-    - If it exists and ADMIN_RESET_ON_BOOT is true, reset its password from
-      ADMIN_PASSWORD. This lets you recover a lost admin password with just
-      env + redeploy, since changing ADMIN_PASSWORD alone never updates an
-      already-created user.
+    Creates it from ADMIN_* env vars if missing, or resets its password
+    from ADMIN_PASSWORD when ADMIN_RESET_ON_BOOT is true.
     """
     db = SessionLocal()
     try:
@@ -65,21 +83,18 @@ def _bootstrap_admin() -> None:
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     ensure_dir(settings.DOWNLOAD_DIR)
+    _init_db()
     try:
         _bootstrap_admin()
-    except Exception as exc:  # pragma: no cover - DB not ready on first boot
+    except Exception as exc:  # pragma: no cover
         logger.warning("admin bootstrap skipped: %s", exc)
     yield
 
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    version="0.1.0",
-    description=(
-        "Self-hosted yt-dlp service. Provides a REST API for media downloads "
-        "(MP4/MP3), real-time progress, user accounts, and a bot/AI integration "
-        "interface."
-    ),
+    version="1.0.0",
+    description="Self-hosted yt-dlp service (single-container build).",
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
@@ -105,3 +120,11 @@ app.include_router(metadata.router)
 app.include_router(jobs.router)
 app.include_router(files.router)
 app.include_router(bot.router)
+
+# Serve the statically-exported frontend from the same origin. Mounted LAST
+# so it only catches paths the API routers above didn't claim. html=True
+# serves index.html for directory routes (/, /login/, /history/).
+if os.path.isdir(WEB_DIR):
+    app.mount("/", StaticFiles(directory=WEB_DIR, html=True), name="web")
+else:  # pragma: no cover - dev without a built frontend
+    logger.warning("frontend dir %s not found; serving API only", WEB_DIR)

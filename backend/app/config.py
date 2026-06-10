@@ -1,7 +1,6 @@
 from functools import lru_cache
 from typing import List
 
-from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,7 +9,7 @@ class Settings(BaseSettings):
 
     # General
     PROJECT_NAME: str = "yt-download"
-    ENVIRONMENT: str = "development"
+    ENVIRONMENT: str = "production"
     LOG_LEVEL: str = "INFO"
 
     # Security
@@ -18,36 +17,34 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
 
-    # Public URL (used to build download links returned to clients/bots)
+    # Public URL (used to build download links returned to clients/bots).
+    # For a NAS this is typically http://<nas-ip>:8000.
     PUBLIC_BASE_URL: str = "http://localhost:8000"
 
-    # CORS
-    CORS_ORIGINS: str = "http://localhost:3000"
+    # CORS — single-container serves the UI from the same origin, so this is
+    # only relevant for external API/bot clients. Empty => allow any.
+    CORS_ORIGINS: str = ""
 
     # Admin bootstrap
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str = "admin"
     ADMIN_EMAIL: str = "admin@example.com"
     # When true, the configured admin's password is reset from ADMIN_PASSWORD
-    # on every boot. Use it to recover a lost admin password via env +
-    # redeploy, then set it back to false.
+    # on every boot (recover a lost password with just env + restart).
     ADMIN_RESET_ON_BOOT: bool = False
 
-    # Database
-    DATABASE_URL: str = "postgresql+psycopg2://ytdl:ytdl@db:5432/ytdl"
-
-    # Redis / Celery
-    REDIS_URL: str = "redis://redis:6379/0"
-    CELERY_BROKER_URL: str = "redis://redis:6379/1"
-    CELERY_RESULT_BACKEND: str = "redis://redis:6379/2"
+    # Database — SQLite file inside the data volume. No external DB needed.
+    DATABASE_URL: str = "sqlite:////data/app.db"
 
     # Storage / job limits
     DOWNLOAD_DIR: str = "/data/downloads"
-    MAX_FILE_SIZE_MB: int = 2048
+    MAX_FILE_SIZE_MB: int = 4096
     JOB_TIMEOUT_SECONDS: int = 3600
+    # How many downloads run at once (in-process thread pool).
+    DOWNLOAD_CONCURRENCY: int = 2
 
     # Quotas
-    DEFAULT_DAILY_JOB_QUOTA: int = 50
+    DEFAULT_DAILY_JOB_QUOTA: int = 1000
     DEFAULT_CONCURRENT_JOBS: int = 3
     DOWNLOAD_TOKEN_TTL_SECONDS: int = 86400
 
@@ -59,7 +56,7 @@ class Settings(BaseSettings):
     BOT_API_KEY: str = "change-me-bot-key"
 
     # yt-dlp cookies — used to get past YouTube's "Sign in to confirm you're
-    # not a bot" on datacenter IPs. Provide ONE of:
+    # not a bot" on datacenter/NAS IPs. Provide ONE of:
     #   YTDLP_COOKIES_FILE    path to a mounted Netscape cookies.txt
     #   YTDLP_COOKIES_B64     base64 of a cookies.txt (robust through env vars)
     #   YTDLP_COOKIES_CONTENT raw cookies.txt text (needs a multiline env var)

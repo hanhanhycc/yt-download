@@ -1,80 +1,53 @@
-"""Lightweight Redis-backed rate limiter and quota helpers.
+"""In-process rate limiting and daily quota counters.
 
-Used to throttle expensive endpoints (metadata, job creation) and to
-enforce per-user daily job quotas. Designed to be cheap and best-effort:
-if Redis is unavailable, calls fall open (logged warning) so the app
-keeps working for the personal-use MVP case.
+The single-container build has no Redis. These counters live in memory
+(fine for a personal/NAS deployment running one process). They reset when
+the container restarts. `get_redis()` is kept and always returns None so
+the SSE endpoint transparently falls back to DB polling.
 """
 from __future__ import annotations
 
-import logging
+import threading
 import time
 from typing import Optional
 
-import redis
-
-from app.config import settings
-
-logger = logging.getLogger(__name__)
-
-_redis_client: Optional[redis.Redis] = None
+_lock = threading.Lock()
+# key -> (window_bucket, count)
+_rate_buckets: dict[str, tuple[int, int]] = {}
+# (user_id, day) -> count
+_daily: dict[tuple[int, str], int] = {}
 
 
-def get_redis() -> Optional[redis.Redis]:
-    global _redis_client
-    if _redis_client is None:
-        try:
-            _redis_client = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
-            _redis_client.ping()
-        except Exception as exc:  # pragma: no cover - infra failure
-            logger.warning("redis unavailable: %s", exc)
-            _redis_client = None
-    return _redis_client
+def get_redis() -> Optional[object]:
+    """No Redis in the single-container build (SSE falls back to polling)."""
+    return None
 
 
 def check_rate_limit(key: str, limit: int, window_seconds: int) -> tuple[bool, int]:
-    """Sliding-fixed-window limiter. Returns (allowed, remaining)."""
-    r = get_redis()
-    if r is None:
-        return True, limit
+    """Fixed-window limiter. Returns (allowed, remaining)."""
     bucket = int(time.time()) // window_seconds
-    redis_key = f"rl:{key}:{bucket}"
-    try:
-        count = r.incr(redis_key)
-        if count == 1:
-            r.expire(redis_key, window_seconds)
-        remaining = max(0, limit - int(count))
-        return int(count) <= limit, remaining
-    except Exception as exc:  # pragma: no cover
-        logger.warning("rate limit failure: %s", exc)
-        return True, limit
+    with _lock:
+        cur_bucket, count = _rate_buckets.get(key, (bucket, 0))
+        if cur_bucket != bucket:
+            count = 0
+        count += 1
+        _rate_buckets[key] = (bucket, count)
+    remaining = max(0, limit - count)
+    return count <= limit, remaining
+
+
+def _day() -> str:
+    return time.strftime("%Y%m%d", time.gmtime())
 
 
 def increment_daily_quota(user_id: int) -> int:
-    """Increment today's job counter for the user. Returns new count."""
-    r = get_redis()
-    if r is None:
-        return 0
-    day = time.strftime("%Y%m%d", time.gmtime())
-    key = f"quota:daily:{user_id}:{day}"
-    try:
-        count = r.incr(key)
-        if count == 1:
-            r.expire(key, 60 * 60 * 26)
-        return int(count)
-    except Exception as exc:  # pragma: no cover
-        logger.warning("quota incr failure: %s", exc)
-        return 0
+    key = (user_id, _day())
+    with _lock:
+        count = _daily.get(key, 0) + 1
+        _daily[key] = count
+    return count
 
 
 def get_daily_quota(user_id: int) -> int:
-    r = get_redis()
-    if r is None:
-        return 0
-    day = time.strftime("%Y%m%d", time.gmtime())
-    key = f"quota:daily:{user_id}:{day}"
-    try:
-        val = r.get(key)
-        return int(val) if val else 0
-    except Exception:  # pragma: no cover
-        return 0
+    with _lock:
+        return _daily.get((user_id, _day()), 0)

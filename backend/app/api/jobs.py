@@ -23,7 +23,7 @@ from app.database import get_db
 from app.models.job import DownloadJob, JobFormat, JobStatus
 from app.models.user import User
 from app.schemas.job import JobCreate, JobList, JobRead
-from app.workers.tasks import run_download
+from app.workers.runner import request_cancel, submit_download
 
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 
@@ -101,9 +101,8 @@ def create_job_for_user(
     db.refresh(job)
 
     increment_daily_quota(user.id)
-    async_result = run_download.delay(job.id)
-    job.celery_task_id = async_result.id
-    db.commit()
+    # Hand off to the in-process download thread pool.
+    submit_download(job.id)
     return job
 
 
@@ -162,10 +161,9 @@ def delete_job(
     job = db.get(DownloadJob, job_id)
     if not job or job.user_id != user.id:
         raise HTTPException(status_code=404, detail="job not found")
-    if job.status in (JobStatus.PENDING, JobStatus.RUNNING) and job.celery_task_id:
-        from app.workers.celery_app import celery
-
-        celery.control.revoke(job.celery_task_id, terminate=True, signal="SIGTERM")
+    if job.status in (JobStatus.PENDING, JobStatus.RUNNING):
+        # Cooperative cancel: the running download checks this flag and stops.
+        request_cancel(job.id)
         job.status = JobStatus.CANCELED
         db.commit()
     else:

@@ -1,5 +1,6 @@
-export const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+// Same-origin by default: the backend serves this static frontend, so API
+// calls go to /api/* relatively. Override only for split-origin dev.
+export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 const TOKEN_KEY = "ytdl_token";
 
