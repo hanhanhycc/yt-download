@@ -63,8 +63,8 @@ log "new image id:     ${NEW_ID:-<none>}"
 if [ "$FORCE_RECREATE" != "1" ] && [ -n "$OLD_ID" ] && [ "$OLD_ID" = "$NEW_ID" ]; then
     log "image unchanged — skipping recreate (set FORCE_RECREATE=1 to override)"
 else
-    log "==> docker compose up -d (recreating $SERVICE)"
-    $DC -f "$COMPOSE_FILE" up -d --remove-orphans "$SERVICE" 2>&1 | tee -a "$LOG_FILE"
+    log "==> docker compose up -d --force-recreate (recreating $SERVICE)"
+    $DC -f "$COMPOSE_FILE" up -d --force-recreate --remove-orphans "$SERVICE" 2>&1 | tee -a "$LOG_FILE"
 fi
 
 log "==> docker image prune -f (clean up dangling layers)"
