@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AuthNav } from "@/components/auth-nav";
 
 export const metadata: Metadata = {
   title: "Loom · Self-hosted media downloader",
@@ -56,9 +57,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               >
                 API
               </a>
-              <Link href="/login" className="btn-ghost ml-2 !py-1.5 !px-3 !text-sm whitespace-nowrap">
-                Sign in
-              </Link>
+              <AuthNav />
             </nav>
           </div>
         </header>
