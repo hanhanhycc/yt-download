@@ -37,10 +37,15 @@ def upgrade() -> None:
     op.create_index("ix_users_username", "users", ["username"], unique=True)
     op.create_index("ix_users_email", "users", ["email"], unique=True)
 
+    # create_type=False: we create the enum types explicitly below (with
+    # checkfirst), so the later create_table() must NOT try to emit
+    # CREATE TYPE again — otherwise it raises DuplicateObject even on a
+    # fresh database.
     job_status = sa.Enum(
-        "pending", "running", "completed", "failed", "canceled", name="job_status"
+        "pending", "running", "completed", "failed", "canceled",
+        name="job_status", create_type=False,
     )
-    job_format = sa.Enum("mp4", "mp3", name="job_format")
+    job_format = sa.Enum("mp4", "mp3", name="job_format", create_type=False)
     job_status.create(op.get_bind(), checkfirst=True)
     job_format.create(op.get_bind(), checkfirst=True)
 
