@@ -3,9 +3,13 @@
 Uses a per-job random token (stored in DB, ttl-enforced) to authorize
 downloads. This avoids exposing absolute filesystem paths and supports
 shareable temporary links for bots/AI integrations.
+
+Once a download finishes streaming to the client, the file is deleted
+from disk and its token is invalidated — the NAS doesn't keep copies.
 """
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated
@@ -13,11 +17,56 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
+from starlette.background import BackgroundTask
 
-from app.database import get_db
+from app.config import settings
+from app.database import SessionLocal, get_db
 from app.models.job import DownloadJob, JobStatus
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/files", tags=["files"])
+
+
+def _cleanup_after_download(job_id: int, file_path: str) -> None:
+    """Remove the downloaded file and invalidate its token.
+
+    Runs as a Starlette BackgroundTask *after* the response body is fully
+    sent (or the client disconnects). Wrapped in broad try/except so a
+    cleanup failure never bubbles back to the user — at worst it leaves
+    a stray file behind to be removed manually.
+    """
+    try:
+        path = Path(file_path).resolve()
+        # Safety: only delete files that live inside the configured
+        # download root, never anywhere else on disk.
+        download_root = Path(settings.DOWNLOAD_DIR).resolve()
+        try:
+            path.relative_to(download_root)
+        except ValueError:
+            logger.warning("refusing to delete %s: outside DOWNLOAD_DIR", path)
+        else:
+            if path.is_file():
+                path.unlink()
+                logger.info("deleted %s after download (job %s)", path, job_id)
+    except Exception as exc:  # pragma: no cover - best-effort cleanup
+        logger.warning("file cleanup failed for job %s: %s", job_id, exc)
+
+    # Always clear the DB references so the link/history no longer offers
+    # the file for download.
+    db = SessionLocal()
+    try:
+        job = db.get(DownloadJob, job_id)
+        if job is not None:
+            job.file_path = None
+            job.download_token = None
+            job.token_expires_at = None
+            db.commit()
+    except Exception as exc:  # pragma: no cover
+        logger.warning("clearing job refs failed for %s: %s", job_id, exc)
+        db.rollback()
+    finally:
+        db.close()
 
 
 @router.get("/{job_id}", summary="Download the result of a completed job (token-protected)")
@@ -53,4 +102,8 @@ def download_file(
         path=str(path),
         filename=path.name,
         media_type="application/octet-stream",
+        # Delete the file from the NAS and invalidate the token once the
+        # client has finished downloading (or has disconnected). The job
+        # row stays in history; the download link just becomes inactive.
+        background=BackgroundTask(_cleanup_after_download, job.id, str(path)),
     )
