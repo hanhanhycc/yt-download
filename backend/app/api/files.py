@@ -33,8 +33,15 @@ def download_file(
         raise HTTPException(status_code=409, detail="job not completed")
     if not job.download_token or token != job.download_token:
         raise HTTPException(status_code=403, detail="invalid token")
-    if job.token_expires_at and job.token_expires_at < datetime.now(timezone.utc):
-        raise HTTPException(status_code=410, detail="download token expired")
+    # SQLite stores DateTime(timezone=True) as naïve UTC; normalize before
+    # comparing so we don't crash with "can't compare offset-naive and
+    # offset-aware datetimes" (which surfaces as a 500 to the client).
+    expires_at = job.token_expires_at
+    if expires_at is not None:
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if expires_at < datetime.now(timezone.utc):
+            raise HTTPException(status_code=410, detail="download token expired")
     if not job.file_path:
         raise HTTPException(status_code=404, detail="file missing")
 
