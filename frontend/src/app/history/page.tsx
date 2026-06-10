@@ -145,21 +145,39 @@ function JobRow({ job, onDelete }: { job: Job; onDelete: (id: number) => void })
 
   return (
     <div className="card !p-4 flex items-center gap-4 hover:border-white/20 transition">
-      {job.thumbnail ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={job.thumbnail}
-          alt=""
-          className="w-28 h-16 rounded-lg object-cover border border-white/10 shrink-0"
-        />
-      ) : (
-        <div className="w-28 h-16 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/40 shrink-0">
-          {platform.node}
-        </div>
-      )}
+      <a
+        href={job.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="shrink-0 group"
+        title="Open original on source site"
+      >
+        {job.thumbnail ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={job.thumbnail}
+            alt=""
+            className="w-28 h-16 rounded-lg object-cover border border-white/10 transition group-hover:opacity-90"
+          />
+        ) : (
+          <div className="w-28 h-16 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/40">
+            {platform.node}
+          </div>
+        )}
+      </a>
 
       <div className="flex-1 min-w-0">
-        <div className="font-medium truncate">{job.title || job.url}</div>
+        <div className="font-medium truncate">
+          <a
+            href={job.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-brand-light transition underline-offset-4 hover:underline"
+            title="Open original on source site"
+          >
+            {job.title || job.url}
+          </a>
+        </div>
         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-white/50">
           <span className="chip !py-0.5 !px-2">{platform.node}{platform.name}</span>
           <span className="uppercase">{job.format}</span>

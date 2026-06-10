@@ -282,13 +282,19 @@ function MetadataCard({
   return (
     <section className="card animate-fade-up">
       <div className="grid md:grid-cols-[280px_1fr] gap-6">
-        <div className="relative">
+        <a
+          href={meta.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="relative block group"
+          title="Open original on source site"
+        >
           {meta.thumbnail ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={meta.thumbnail}
               alt=""
-              className="w-full aspect-video object-cover rounded-xl border border-white/10"
+              className="w-full aspect-video object-cover rounded-xl border border-white/10 transition group-hover:opacity-90"
             />
           ) : (
             <div className="w-full aspect-video rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/30">
@@ -304,10 +310,20 @@ function MetadataCard({
               {fmtDuration(meta.duration)}
             </div>
           )}
-        </div>
+        </a>
 
         <div className="min-w-0 flex flex-col">
-          <h2 className="text-xl font-semibold leading-snug">{meta.title || "Untitled"}</h2>
+          <h2 className="text-xl font-semibold leading-snug">
+            <a
+              href={meta.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-brand-light transition underline-offset-4 hover:underline"
+              title="Open original on source site"
+            >
+              {meta.title || "Untitled"}
+            </a>
+          </h2>
           {meta.uploader && (
             <div className="text-sm text-white/50 mt-1">by {meta.uploader}</div>
           )}
@@ -416,20 +432,38 @@ function JobProgressCard({ job }: { job: Job }) {
     <section className="card animate-fade-up">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3 min-w-0">
-          {job.thumbnail ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={job.thumbnail}
-              alt=""
-              className="w-20 h-20 rounded-lg object-cover border border-white/10 shrink-0"
-            />
-          ) : (
-            <div className="w-20 h-20 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/40 shrink-0">
-              {platform.node}
-            </div>
-          )}
+          <a
+            href={job.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="shrink-0 group"
+            title="Open original on source site"
+          >
+            {job.thumbnail ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={job.thumbnail}
+                alt=""
+                className="w-20 h-20 rounded-lg object-cover border border-white/10 transition group-hover:opacity-90"
+              />
+            ) : (
+              <div className="w-20 h-20 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/40">
+                {platform.node}
+              </div>
+            )}
+          </a>
           <div className="min-w-0">
-            <h3 className="font-semibold truncate">{job.title || job.url}</h3>
+            <h3 className="font-semibold truncate">
+              <a
+                href={job.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-brand-light transition underline-offset-4 hover:underline"
+                title="Open original on source site"
+              >
+                {job.title || job.url}
+              </a>
+            </h3>
             <div className="mt-1 flex items-center gap-2 text-xs text-white/50">
               <span className="chip !py-0.5 !px-2">
                 {platform.node}
