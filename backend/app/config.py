@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
 
+    # When false (default), the app is open — no login needed and all
+    # actions run as the admin user. Set true to require login (recommended
+    # if you expose the app to the internet).
+    AUTH_REQUIRED: bool = False
+
     # Public URL (used to build download links returned to clients/bots).
     # For a NAS this is typically http://<nas-ip>:8000.
     PUBLIC_BASE_URL: str = "http://localhost:8000"

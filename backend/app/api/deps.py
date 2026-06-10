@@ -5,6 +5,14 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+
+def _admin_user(db: Session) -> Optional["User"]:
+    return (
+        db.query(User)
+        .filter(func.lower(User.username) == settings.ADMIN_USERNAME.strip().lower())
+        .first()
+    )
+
 from app.config import settings
 from app.core.security import decode_token
 from app.database import get_db
@@ -32,6 +40,11 @@ def get_current_user(
     token: Annotated[Optional[str], Depends(oauth2_scheme)],
     db: Annotated[Session, Depends(get_db)],
 ) -> User:
+    # Open mode (AUTH_REQUIRED=false): no login needed; act as the admin user.
+    if not settings.AUTH_REQUIRED:
+        admin = _admin_user(db)
+        if admin is not None:
+            return admin
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

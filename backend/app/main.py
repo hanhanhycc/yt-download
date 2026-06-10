@@ -115,6 +115,12 @@ def health():
     return {"status": "ok", "service": settings.PROJECT_NAME}
 
 
+@app.get("/api/config", tags=["meta"])
+def public_config():
+    """Public, unauthenticated UI config."""
+    return {"auth_required": settings.AUTH_REQUIRED}
+
+
 app.include_router(auth.router)
 app.include_router(metadata.router)
 app.include_router(jobs.router)

@@ -15,6 +15,9 @@ services:
     environment:
       # --- change these ---
       SECRET_KEY: ${SECRET_KEY:-change-me-to-a-long-random-string}
+      # Open by default (no login). Set true to require login (recommended
+      # only if you expose the app to the internet).
+      AUTH_REQUIRED: ${AUTH_REQUIRED:-false}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
       # Set true once to (re)set the admin password from ADMIN_PASSWORD, then false.

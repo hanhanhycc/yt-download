@@ -2,24 +2,35 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { getToken, setToken } from "@/lib/api";
+import { API_BASE, getToken, setToken } from "@/lib/api";
 
 /**
- * Header auth control. Reflects the real login state (token in
- * localStorage): shows "Sign in" when logged out and "Sign out" when
- * logged in. Without this the header always said "Sign in", which made a
- * successful login look like it had failed.
+ * Header auth control.
+ *
+ * - If the backend runs in open mode (AUTH_REQUIRED=false) it renders
+ *   nothing — there's no login to show.
+ * - Otherwise it reflects the real login state: "Sign in" when logged out,
+ *   "Sign out" when a token is present.
  */
 export function AuthNav() {
+  const [authRequired, setAuthRequired] = useState<boolean | null>(null);
   const [authed, setAuthed] = useState(false);
 
   useEffect(() => {
     const sync = () => setAuthed(!!getToken());
     sync();
-    // Reflect login/logout that happened in another tab.
     window.addEventListener("storage", sync);
+
+    fetch(`${API_BASE}/api/config`)
+      .then((r) => r.json())
+      .then((c) => setAuthRequired(!!c.auth_required))
+      .catch(() => setAuthRequired(true)); // fail safe: assume login exists
+
     return () => window.removeEventListener("storage", sync);
   }, []);
+
+  // Open mode (or while we don't know yet): show nothing.
+  if (authRequired !== true) return null;
 
   if (!authed) {
     return (
