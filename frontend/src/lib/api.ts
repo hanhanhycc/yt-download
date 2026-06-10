@@ -33,11 +33,20 @@ export async function api<T>(path: string, opts: ApiOpts = {}): Promise<T> {
     }
   }
   if (!res.ok) {
-    let detail: any = res.statusText;
+    let detail = "";
     try {
-      detail = (await res.json()).detail || detail;
-    } catch {}
-    throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+      const data = await res.json();
+      detail =
+        typeof data?.detail === "string"
+          ? data.detail
+          : data?.detail
+          ? JSON.stringify(data.detail)
+          : "";
+    } catch {
+      // Non-JSON body (e.g. an HTML 502 from the proxy when the backend is down).
+    }
+    // statusText is empty over HTTP/2 (Coolify/Traefik TLS), so fall back to the status code.
+    throw new Error(detail || res.statusText || `Request failed (HTTP ${res.status})`);
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
@@ -96,11 +105,11 @@ export async function login(username: string, password: string) {
     body: form.toString(),
   });
   if (!res.ok) {
-    let detail = "Login failed";
+    let detail = "";
     try {
-      detail = (await res.json()).detail || detail;
+      detail = (await res.json()).detail || "";
     } catch {}
-    throw new Error(detail);
+    throw new Error(detail || `Login failed (HTTP ${res.status})`);
   }
   const data = await res.json();
   setToken(data.access_token);

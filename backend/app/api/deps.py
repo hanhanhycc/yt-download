@@ -2,6 +2,7 @@ from typing import Annotated, Optional
 
 from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -56,8 +57,8 @@ def get_bot_user(
     """
     if not x_bot_api_key or x_bot_api_key != settings.BOT_API_KEY:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid bot key")
-    username = x_bot_user or settings.ADMIN_USERNAME
-    user = db.query(User).filter(User.username == username).first()
+    username = (x_bot_user or settings.ADMIN_USERNAME).strip().lower()
+    user = db.query(User).filter(func.lower(User.username) == username).first()
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Bot user not found")
     return user
