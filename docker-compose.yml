@@ -11,7 +11,7 @@ services:
     # build: .
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8182:8000"
     environment:
       # --- change these ---
       SECRET_KEY: ${SECRET_KEY:-change-me-to-a-long-random-string}
@@ -20,7 +20,7 @@ services:
       # Set true once to (re)set the admin password from ADMIN_PASSWORD, then false.
       ADMIN_RESET_ON_BOOT: ${ADMIN_RESET_ON_BOOT:-false}
       # Public URL used to build download links — usually http://<nas-ip>:8000
-      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8000}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8182}
       BOT_API_KEY: ${BOT_API_KEY:-change-me-bot-key}
 
       # --- optional ---

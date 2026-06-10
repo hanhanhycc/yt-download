@@ -53,12 +53,12 @@ The image is built automatically by GitHub Actions and published to
        image: ghcr.io/hanhanhycc/yt-download:latest
        restart: unless-stopped
        ports:
-         - "8000:8000"
+         - "8182:8000"
        environment:
          SECRET_KEY: "<a-long-random-string>"
          ADMIN_USERNAME: "admin"
          ADMIN_PASSWORD: "<your-password>"
-         PUBLIC_BASE_URL: "http://<nas-ip>:8000"
+         PUBLIC_BASE_URL: "http://<nas-ip>:8182"
          DOWNLOAD_CONCURRENCY: "2"
          # Optional, to download from YouTube (see Cookies below):
          YTDLP_COOKIES_B64: ""
@@ -67,7 +67,7 @@ The image is built automatically by GitHub Actions and published to
    ```
 
 4. Build/run the project.
-5. Open `http://<nas-ip>:8000` and log in with `ADMIN_USERNAME` /
+5. Open `http://<nas-ip>:8182` and log in with `ADMIN_USERNAME` /
    `ADMIN_PASSWORD`.
 
 > Lost the admin password? Set `ADMIN_RESET_ON_BOOT: "true"` and
@@ -81,16 +81,16 @@ The image is built automatically by GitHub Actions and published to
 ```bash
 cp .env.example .env        # edit SECRET_KEY, ADMIN_PASSWORD, ...
 docker compose up -d
-# UI + API:  http://localhost:8000
+# UI + API:  http://localhost:8182
 ```
 
 Or a plain `docker run`:
 
 ```bash
-docker run -d --name yt-download -p 8000:8000 \
+docker run -d --name yt-download -p 8182:8000 \
   -e SECRET_KEY="a-long-random-string" \
   -e ADMIN_PASSWORD="your-password" \
-  -e PUBLIC_BASE_URL="http://localhost:8000" \
+  -e PUBLIC_BASE_URL="http://localhost:8182" \
   -v "$PWD/data:/data" \
   ghcr.io/hanhanhycc/yt-download:latest
 ```
