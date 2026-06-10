@@ -11,11 +11,15 @@ import threading
 import time
 from typing import Optional
 
+from fastapi import Request
+
 _lock = threading.Lock()
 # key -> (window_bucket, count)
 _rate_buckets: dict[str, tuple[int, int]] = {}
 # (user_id, day) -> count
 _daily: dict[tuple[int, str], int] = {}
+# (ip, day) -> count
+_ip_daily: dict[tuple[str, str], int] = {}
 
 
 def get_redis() -> Optional[object]:
@@ -51,3 +55,34 @@ def increment_daily_quota(user_id: int) -> int:
 def get_daily_quota(user_id: int) -> int:
     with _lock:
         return _daily.get((user_id, _day()), 0)
+
+
+def increment_ip_daily_quota(ip: str) -> int:
+    key = (ip, _day())
+    with _lock:
+        count = _ip_daily.get(key, 0) + 1
+        _ip_daily[key] = count
+    return count
+
+
+def get_ip_daily_quota(ip: str) -> int:
+    with _lock:
+        return _ip_daily.get((ip, _day()), 0)
+
+
+def get_client_ip(request: Request) -> str:
+    """Best-effort client IP, honoring reverse-proxy headers.
+
+    Trusts X-Forwarded-For / X-Real-IP because this app is meant to sit
+    behind a reverse proxy (Coolify / Traefik / Nginx / Cloudflare). The
+    leftmost entry in X-Forwarded-For is the original client.
+    """
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        return xff.split(",")[0].strip()
+    real = request.headers.get("x-real-ip")
+    if real:
+        return real.strip()
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"

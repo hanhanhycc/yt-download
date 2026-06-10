@@ -5,7 +5,7 @@ import asyncio
 import json
 from typing import Annotated, AsyncIterator
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
@@ -14,9 +14,12 @@ from app.api.deps import get_current_user, _user_from_token
 from app.config import settings
 from app.core.rate_limit import (
     check_rate_limit,
+    get_client_ip,
     get_daily_quota,
+    get_ip_daily_quota,
     get_redis,
     increment_daily_quota,
+    increment_ip_daily_quota,
 )
 from app.core.url_validator import URLValidationError, validate_url
 from app.database import get_db
@@ -117,10 +120,36 @@ def create_job_for_user(
 )
 def create_job(
     payload: JobCreate,
+    request: Request,
     user: Annotated[User, Depends(get_current_user)],
     db: Annotated[Session, Depends(get_db)],
 ):
+    # Public-facing per-IP daily quota: anonymous abusers can't burn through
+    # the NAS's bandwidth. Authenticated, non-admin users are still capped
+    # by their per-user daily quota inside create_job_for_user; the IP cap
+    # below is enforced for everyone except IPs in IP_QUOTA_EXEMPT.
+    ip_limit = settings.IP_DAILY_DOWNLOAD_QUOTA
+    if ip_limit and ip_limit > 0:
+        client_ip = get_client_ip(request)
+        if client_ip not in settings.ip_quota_exempt_list:
+            used = get_ip_daily_quota(client_ip)
+            if used >= ip_limit:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=(
+                        f"You have reached the daily limit of {ip_limit} downloads "
+                        f"for your IP. Please try again tomorrow."
+                    ),
+                )
+
     job = create_job_for_user(db, user, payload, source="web")
+
+    # Only count successful job creations against the IP quota.
+    if ip_limit and ip_limit > 0:
+        client_ip = get_client_ip(request)
+        if client_ip not in settings.ip_quota_exempt_list:
+            increment_ip_daily_quota(client_ip)
+
     return _serialize(job)
 
 

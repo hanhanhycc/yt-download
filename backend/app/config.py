@@ -53,6 +53,12 @@ class Settings(BaseSettings):
     DEFAULT_CONCURRENT_JOBS: int = 3
     DOWNLOAD_TOKEN_TTL_SECONDS: int = 86400
 
+    # Per-IP daily quota for public/anonymous abuse protection.
+    # 0 disables the per-IP limit.
+    IP_DAILY_DOWNLOAD_QUOTA: int = 20
+    # Comma-separated IPs exempted from the per-IP limit (e.g. your own).
+    IP_QUOTA_EXEMPT: str = ""
+
     # URL filtering
     ALLOWED_DOMAINS: str = ""
     BLOCKED_DOMAINS: str = "localhost,127.0.0.1,0.0.0.0,169.254.169.254"
@@ -72,6 +78,10 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> List[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+
+    @property
+    def ip_quota_exempt_list(self) -> List[str]:
+        return [ip.strip() for ip in self.IP_QUOTA_EXEMPT.split(",") if ip.strip()]
 
     @property
     def allowed_domains_list(self) -> List[str]:
