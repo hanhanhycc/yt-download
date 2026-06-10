@@ -6,7 +6,9 @@ Provides:
 """
 from __future__ import annotations
 
+import base64
 import logging
+import os
 from typing import Any, Callable
 
 from yt_dlp import YoutubeDL
@@ -14,6 +16,40 @@ from yt_dlp import YoutubeDL
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+_COOKIES_PATH = "/tmp/yt_cookies.txt"
+
+
+def _cookies_file() -> str | None:
+    """Return a path to a Netscape cookies.txt for yt-dlp, or None.
+
+    Lets us get past YouTube's "Sign in to confirm you're not a bot" on
+    datacenter IPs. Priority: an explicit mounted file, then base64 env,
+    then raw env content (written to a temp file).
+    """
+    explicit = settings.YTDLP_COOKIES_FILE.strip()
+    if explicit and os.path.exists(explicit):
+        return explicit
+
+    b64 = settings.YTDLP_COOKIES_B64.strip()
+    if b64:
+        try:
+            with open(_COOKIES_PATH, "wb") as fh:
+                fh.write(base64.b64decode(b64))
+            return _COOKIES_PATH
+        except Exception as exc:  # pragma: no cover - bad input
+            logger.warning("could not decode YTDLP_COOKIES_B64: %s", exc)
+
+    content = settings.YTDLP_COOKIES_CONTENT
+    if content.strip():
+        try:
+            with open(_COOKIES_PATH, "w", encoding="utf-8") as fh:
+                fh.write(content)
+            return _COOKIES_PATH
+        except OSError as exc:  # pragma: no cover
+            logger.warning("could not write YTDLP_COOKIES_CONTENT: %s", exc)
+
+    return None
 
 
 _QUALITY_TO_HEIGHT = {
@@ -53,6 +89,9 @@ def extract_metadata(url: str) -> dict[str, Any]:
         "extract_flat": False,
         "socket_timeout": 30,
     }
+    cookies = _cookies_file()
+    if cookies:
+        ydl_opts["cookiefile"] = cookies
     with YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)
 
@@ -111,6 +150,10 @@ def build_ydl_opts(
         "concurrent_fragment_downloads": 4,
         "progress_hooks": [progress_hook] if progress_hook else [],
     }
+
+    cookies = _cookies_file()
+    if cookies:
+        common["cookiefile"] = cookies
 
     if fmt == "mp3":
         bitrate = quality if quality in _MP3_BITRATES else "192"

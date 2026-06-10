@@ -58,6 +58,15 @@ class Settings(BaseSettings):
     # Bot
     BOT_API_KEY: str = "change-me-bot-key"
 
+    # yt-dlp cookies — used to get past YouTube's "Sign in to confirm you're
+    # not a bot" on datacenter IPs. Provide ONE of:
+    #   YTDLP_COOKIES_FILE    path to a mounted Netscape cookies.txt
+    #   YTDLP_COOKIES_B64     base64 of a cookies.txt (robust through env vars)
+    #   YTDLP_COOKIES_CONTENT raw cookies.txt text (needs a multiline env var)
+    YTDLP_COOKIES_FILE: str = ""
+    YTDLP_COOKIES_B64: str = ""
+    YTDLP_COOKIES_CONTENT: str = ""
+
     @property
     def cors_origins_list(self) -> List[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
