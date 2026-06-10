@@ -17,6 +17,17 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    # Recovery guard. Earlier broken runs of this initial migration could
+    # fail mid-way WITHOUT stamping alembic_version, leaving stray objects
+    # (e.g. the job_format enum) that made every re-run crash with
+    # DuplicateObject. This is the first migration (down_revision=None), so
+    # the target DB is meant to be empty — clear any leftovers to make the
+    # migration safe to re-run on a partially-initialized database.
+    op.execute("DROP TABLE IF EXISTS download_jobs CASCADE")
+    op.execute("DROP TABLE IF EXISTS users CASCADE")
+    op.execute("DROP TYPE IF EXISTS job_format")
+    op.execute("DROP TYPE IF EXISTS job_status")
+
     op.create_table(
         "users",
         sa.Column("id", sa.Integer(), primary_key=True),
