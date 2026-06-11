@@ -4,8 +4,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, List
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import desc, func
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import desc, func, or_
 from sqlalchemy.orm import Session
 
 from app.api.deps import PUBLIC_USERNAME, get_current_admin
@@ -13,9 +13,11 @@ from app.core.retention import as_utc
 from app.core.security import generate_invite_code, hash_password
 from app.database import get_db
 from app.models.invite import InviteCode
-from app.models.job import DownloadJob
+from app.models.job import DownloadJob, JobStatus
 from app.models.user import User
 from app.schemas.auth import (
+    AdminJobList,
+    AdminJobRead,
     AdminResetPassword,
     AdminUserCreate,
     AdminUserRead,
@@ -172,3 +174,56 @@ def delete_invite(invite_id: int, db: Annotated[Session, Depends(get_db)]):
     db.delete(invite)
     db.commit()
     return None
+
+
+# ----- All download history (across every user, with requesting IP) -----
+
+@router.get("/jobs", response_model=AdminJobList, summary="All downloads (any user) + IP")
+def list_all_jobs(
+    db: Annotated[Session, Depends(get_db)],
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    status_filter: str | None = Query(None, alias="status"),
+    search: str | None = Query(None, description="match URL, title, IP or username"),
+):
+    q = db.query(DownloadJob, User).join(User, DownloadJob.user_id == User.id)
+
+    if status_filter:
+        try:
+            q = q.filter(DownloadJob.status == JobStatus(status_filter))
+        except ValueError:
+            raise HTTPException(status_code=400, detail="invalid status filter")
+
+    if search:
+        like = f"%{search.strip()}%"
+        q = q.filter(
+            or_(
+                DownloadJob.url.ilike(like),
+                DownloadJob.title.ilike(like),
+                DownloadJob.client_ip.ilike(like),
+                User.username.ilike(like),
+            )
+        )
+
+    total = q.count()
+    rows = q.order_by(desc(DownloadJob.created_at)).offset(offset).limit(limit).all()
+
+    items = [
+        AdminJobRead(
+            id=job.id,
+            username=user.username,
+            is_public=user.is_public,
+            source=job.source,
+            client_ip=job.client_ip,
+            url=job.url,
+            title=job.title,
+            format=job.format.value if hasattr(job.format, "value") else str(job.format),
+            quality=job.quality,
+            status=job.status.value if hasattr(job.status, "value") else str(job.status),
+            file_size=job.file_size,
+            created_at=job.created_at,
+            finished_at=job.finished_at,
+        )
+        for job, user in rows
+    ]
+    return AdminJobList(total=total, items=items)

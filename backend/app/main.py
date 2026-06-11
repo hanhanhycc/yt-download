@@ -56,15 +56,21 @@ def _migrate_schema() -> None:
     so back-fill columns added after a deployment's DB already exists.
     """
     inspector = inspect(engine)
-    if "users" not in inspector.get_table_names():
-        return
-    existing = {c["name"] for c in inspector.get_columns("users")}
-    if "is_public" not in existing:
-        with engine.begin() as conn:
-            conn.execute(
-                text("ALTER TABLE users ADD COLUMN is_public BOOLEAN NOT NULL DEFAULT 0")
-            )
-        logger.info("migrated: added users.is_public column")
+    tables = inspector.get_table_names()
+    if "users" in tables:
+        user_cols = {c["name"] for c in inspector.get_columns("users")}
+        if "is_public" not in user_cols:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE users ADD COLUMN is_public BOOLEAN NOT NULL DEFAULT 0")
+                )
+            logger.info("migrated: added users.is_public column")
+    if "download_jobs" in tables:
+        job_cols = {c["name"] for c in inspector.get_columns("download_jobs")}
+        if "client_ip" not in job_cols:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE download_jobs ADD COLUMN client_ip VARCHAR(64)"))
+            logger.info("migrated: added download_jobs.client_ip column")
 
 
 def _bootstrap_users() -> None:

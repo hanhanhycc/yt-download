@@ -89,3 +89,24 @@ class InviteRead(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class AdminJobRead(BaseModel):
+    id: int
+    username: str
+    is_public: bool
+    source: str
+    client_ip: Optional[str] = None
+    url: str
+    title: Optional[str] = None
+    format: str
+    quality: Optional[str] = None
+    status: str
+    file_size: Optional[int] = None
+    created_at: datetime
+    finished_at: Optional[datetime] = None
+
+
+class AdminJobList(BaseModel):
+    total: int
+    items: list[AdminJobRead]

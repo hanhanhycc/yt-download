@@ -37,6 +37,8 @@ class DownloadJob(Base):
         ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
     )
     source: Mapped[str] = mapped_column(String(32), default="web", nullable=False)  # web|bot|api
+    # Client IP that requested the download (best-effort, honors proxy headers).
+    client_ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     url: Mapped[str] = mapped_column(Text, nullable=False)
     format: Mapped[JobFormat] = mapped_column(

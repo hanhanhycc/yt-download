@@ -13,6 +13,9 @@ export function setToken(token: string | null) {
   if (typeof window === "undefined") return;
   if (token) window.localStorage.setItem(TOKEN_KEY, token);
   else window.localStorage.removeItem(TOKEN_KEY);
+  // localStorage's native "storage" event only fires in *other* tabs, so emit
+  // our own so same-tab listeners (the header nav) update instantly — no F5.
+  window.dispatchEvent(new Event("auth-changed"));
 }
 
 type ApiOpts = RequestInit & { auth?: boolean };
@@ -214,6 +217,29 @@ export async function adminSetActive(userId: number, active: boolean) {
   return api<AdminUser>(`/api/admin/users/${userId}/active?active=${active}`, {
     method: "POST",
   });
+}
+
+export type AdminJob = {
+  id: number;
+  username: string;
+  is_public: boolean;
+  source: string;
+  client_ip?: string | null;
+  url: string;
+  title?: string | null;
+  format: string;
+  quality?: string | null;
+  status: string;
+  file_size?: number | null;
+  created_at: string;
+  finished_at?: string | null;
+};
+
+export async function adminListJobs(params?: { search?: string; status?: string }) {
+  const qs = new URLSearchParams({ limit: "200" });
+  if (params?.search) qs.set("search", params.search);
+  if (params?.status) qs.set("status", params.status);
+  return api<{ total: number; items: AdminJob[] }>(`/api/admin/jobs?${qs.toString()}`);
 }
 
 export async function adminListInvites() {

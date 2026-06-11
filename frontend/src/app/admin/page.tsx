@@ -3,12 +3,14 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  AdminJob,
   AdminUser,
   Invite,
   adminCreateInvite,
   adminCreateUser,
   adminDeleteInvite,
   adminListInvites,
+  adminListJobs,
   adminListUsers,
   adminResetPassword,
   adminSetActive,
@@ -17,14 +19,31 @@ import {
 } from "@/lib/api";
 
 function fmtDate(iso?: string | null) {
-  if (!iso) return "—";
+  if (!iso) return "-";
   return new Date(iso).toLocaleDateString();
+}
+
+function fmtDateTime(iso?: string | null) {
+  if (!iso) return "-";
+  return new Date(iso).toLocaleString();
+}
+
+function fmtBytes(n?: number | null) {
+  if (n == null) return "-";
+  const units = ["B", "KB", "MB", "GB"];
+  let i = 0;
+  let v = n;
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024;
+    i++;
+  }
+  return `${v.toFixed(1)} ${units[i]}`;
 }
 
 export default function AdminPage() {
   const router = useRouter();
   const [authorized, setAuthorized] = useState(false);
-  const [tab, setTab] = useState<"users" | "invites">("users");
+  const [tab, setTab] = useState<"users" | "invites" | "downloads">("users");
 
   useEffect(() => {
     if (!getToken()) {
@@ -61,10 +80,18 @@ export default function AdminPage() {
           >
             Invite codes
           </button>
+          <button
+            onClick={() => setTab("downloads")}
+            className={`pill ${tab === "downloads" ? "pill-active" : ""}`}
+          >
+            Downloads
+          </button>
         </div>
       </header>
 
-      {tab === "users" ? <UsersPanel /> : <InvitesPanel />}
+      {tab === "users" && <UsersPanel />}
+      {tab === "invites" && <InvitesPanel />}
+      {tab === "downloads" && <DownloadsPanel />}
     </div>
   );
 }
@@ -321,6 +348,140 @@ function InvitesPanel() {
             No invite codes yet. Generate one above.
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+const STATUS_COLORS: Record<string, string> = {
+  completed: "bg-emerald-400/15 text-emerald-300 border-emerald-400/30",
+  failed: "bg-red-400/15 text-red-300 border-red-400/30",
+  canceled: "bg-white/10 text-white/60 border-white/20",
+  running: "bg-brand/15 text-brand-light border-brand/30",
+  pending: "bg-amber-400/15 text-amber-300 border-amber-400/30",
+};
+
+function DownloadsPanel() {
+  const [jobs, setJobs] = useState<AdminJob[]>([]);
+  const [total, setTotal] = useState(0);
+  const [search, setSearch] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  async function load(q?: string) {
+    setError(null);
+    try {
+      const res = await adminListJobs({ search: q });
+      setJobs(res.items);
+      setTotal(res.total);
+    } catch (ex: any) {
+      setError(ex.message || "Failed to load downloads");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+    const t = setInterval(() => load(search), 8000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="space-y-4">
+      {error && (
+        <div className="rounded-lg border border-red-400/20 bg-red-400/5 px-3 py-2 text-sm text-red-300">
+          {error}
+        </div>
+      )}
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          load(search);
+        }}
+        className="flex items-center gap-3"
+      >
+        <input
+          className="input"
+          placeholder="Search by URL, title, username or IP…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <button className="btn-ghost shrink-0" type="submit">
+          Search
+        </button>
+      </form>
+
+      <div className="text-xs text-white/40">
+        {total} download{total === 1 ? "" : "s"} total
+      </div>
+
+      <div className="card !p-0 overflow-hidden">
+        <div className="hidden md:grid grid-cols-[1fr_120px_130px_110px_150px] gap-3 px-4 py-3 text-[11px] uppercase tracking-wider text-white/40 border-b border-white/[0.06]">
+          <span>Download</span>
+          <span>User</span>
+          <span>IP address</span>
+          <span>Status</span>
+          <span>When</span>
+        </div>
+
+        {loading && jobs.length === 0 && (
+          <div className="px-4 py-12 text-center text-white/50">Loading…</div>
+        )}
+        {!loading && jobs.length === 0 && (
+          <div className="px-4 py-12 text-center text-white/50">No downloads found.</div>
+        )}
+
+        <div className="divide-y divide-white/[0.05]">
+          {jobs.map((j) => (
+            <div
+              key={j.id}
+              className="grid md:grid-cols-[1fr_120px_130px_110px_150px] gap-1.5 md:gap-3 md:items-center px-4 py-3 hover:bg-white/[0.02] transition"
+            >
+              <div className="min-w-0">
+                <a
+                  href={j.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm font-medium truncate block hover:text-brand-light transition"
+                  title={j.url}
+                >
+                  {j.title || j.url}
+                </a>
+                <div className="text-xs text-white/40 mt-0.5">
+                  <span className="uppercase">{j.format}</span>
+                  {j.quality && <span> · {j.quality}</span>}
+                  <span> · {fmtBytes(j.file_size)}</span>
+                  <span> · via {j.source}</span>
+                </div>
+              </div>
+
+              <div className="text-sm truncate">
+                {j.is_public ? (
+                  <span className="text-white/50">anonymous</span>
+                ) : (
+                  <span>{j.username}</span>
+                )}
+              </div>
+
+              <div className="font-mono text-xs text-white/70 truncate">
+                {j.client_ip || "-"}
+              </div>
+
+              <div>
+                <span
+                  className={`badge border ${STATUS_COLORS[j.status] || STATUS_COLORS.pending}`}
+                >
+                  {j.status}
+                </span>
+              </div>
+
+              <div className="text-xs text-white/50">{fmtDateTime(j.created_at)}</div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

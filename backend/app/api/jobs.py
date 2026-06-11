@@ -84,6 +84,7 @@ def create_job_for_user(
     user: User,
     payload: JobCreate,
     source: str = "web",
+    client_ip: str | None = None,
 ) -> DownloadJob:
     """Shared helper used by the web API and the bot API."""
     try:
@@ -101,6 +102,7 @@ def create_job_for_user(
         quality=payload.quality,
         format_id=payload.format_id,
         status=JobStatus.PENDING,
+        client_ip=client_ip,
     )
     db.add(job)
     db.commit()
@@ -128,9 +130,9 @@ def create_job(
     # the NAS's bandwidth. Authenticated, non-admin users are still capped
     # by their per-user daily quota inside create_job_for_user; the IP cap
     # below is enforced for everyone except IPs in IP_QUOTA_EXEMPT.
+    client_ip = get_client_ip(request)
     ip_limit = settings.IP_DAILY_DOWNLOAD_QUOTA
     if ip_limit and ip_limit > 0:
-        client_ip = get_client_ip(request)
         if client_ip not in settings.ip_quota_exempt_list:
             used = get_ip_daily_quota(client_ip)
             if used >= ip_limit:
@@ -142,11 +144,10 @@ def create_job(
                     ),
                 )
 
-    job = create_job_for_user(db, user, payload, source="web")
+    job = create_job_for_user(db, user, payload, source="web", client_ip=client_ip)
 
     # Only count successful job creations against the IP quota.
     if ip_limit and ip_limit > 0:
-        client_ip = get_client_ip(request)
         if client_ip not in settings.ip_quota_exempt_list:
             increment_ip_daily_quota(client_ip)
 
