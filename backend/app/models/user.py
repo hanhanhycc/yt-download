@@ -16,6 +16,9 @@ class User(Base):
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # The single reserved account that owns all anonymous/public downloads.
+    # Public jobs get the short (4h) retention tier; everyone else is a member.
+    is_public: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Per-user quota overrides (nullable -> use system defaults)
     daily_job_quota: Mapped[int | None] = mapped_column(Integer, nullable=True)

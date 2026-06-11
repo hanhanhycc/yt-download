@@ -24,10 +24,36 @@ container**. State lives in a single `/data` volume:
 - **Web UI** — paste a URL, fetch metadata, pick MP4/MP3 + quality, watch
   live progress, download the file, browse history.
 - **REST API** — Swagger UI at `/docs`.
-- **Auth** — JWT login, bootstrap admin from env.
+- **Accounts & membership** — sign in / sign up, members manage their own
+  password, admins create members, reset passwords and hand out invite codes.
+- **Tiered retention** — anonymous/public history auto-clears every 4 hours
+  (files deleted right after download); members keep 30 days of history and
+  their download links live for 7 days so they can re-download.
 - **Real-time progress** — Server-Sent Events with DB polling.
 - **Bot/AI interface** — `/api/bot/*` endpoints with a static API key.
 - **yt-dlp cookies** support to get past YouTube's bot check.
+
+### Accounts & retention
+
+The app is open by default (`AUTH_REQUIRED=false`): anyone can paste a link and
+download without an account. Those anonymous downloads share a public history
+that is **wiped every `PUBLIC_HISTORY_RETENTION_HOURS` (default 4) hours**, and
+each file is deleted as soon as it finishes downloading.
+
+Visitors can **sign up** (with an invite code from an admin, by default) to
+become **members**. A member's history is kept for
+`MEMBER_HISTORY_RETENTION_DAYS` (default 30) days, and their download links/files
+survive for `MEMBER_DOWNLOAD_TTL_DAYS` (default 7) days before the background
+cleanup sweep removes them.
+
+The bootstrap **admin** (`admin` / `admin123` by default — change it!) can,
+from the **Admin** page in the UI:
+
+- create members directly (no invite code needed),
+- reset any member's password, enable/disable accounts,
+- generate invite codes (single- or multi-use, optional expiry).
+
+Members change their own password from the **Account** page.
 
 ---
 
@@ -126,6 +152,11 @@ Cookies expire — refresh them when the bot check returns.
 | `PUBLIC_BASE_URL`       | Base URL for returned download links             |
 | `DOWNLOAD_CONCURRENCY`  | Parallel downloads (thread pool size)            |
 | `MAX_FILE_SIZE_MB`      | Per-download cap enforced by yt-dlp              |
+| `PUBLIC_HISTORY_RETENTION_HOURS` | Anonymous history auto-clear window (default 4) |
+| `MEMBER_HISTORY_RETENTION_DAYS`  | Member history retention (default 30)   |
+| `MEMBER_DOWNLOAD_TTL_DAYS`       | Member download-link lifetime (default 7) |
+| `REGISTRATION_ENABLED`  | Allow self sign-up                               |
+| `REGISTRATION_REQUIRE_INVITE` | Require an invite code to self-register    |
 | `YTDLP_COOKIES_B64`     | base64 cookies.txt for YouTube                   |
 | `BOT_API_KEY`           | Static key for `/api/bot/*`                      |
 

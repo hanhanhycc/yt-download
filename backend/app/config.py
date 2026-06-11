@@ -32,7 +32,7 @@ class Settings(BaseSettings):
 
     # Admin bootstrap
     ADMIN_USERNAME: str = "admin"
-    ADMIN_PASSWORD: str = "admin"
+    ADMIN_PASSWORD: str = "admin123"
     ADMIN_EMAIL: str = "admin@example.com"
     # When true, the configured admin's password is reset from ADMIN_PASSWORD
     # on every boot (recover a lost password with just env + restart).
@@ -52,6 +52,25 @@ class Settings(BaseSettings):
     DEFAULT_DAILY_JOB_QUOTA: int = 1000
     DEFAULT_CONCURRENT_JOBS: int = 3
     DOWNLOAD_TOKEN_TTL_SECONDS: int = 86400
+
+    # Retention tiers
+    # ----------------
+    # Anonymous/public usage (no login): history rows and files are short-lived
+    # so a public deployment doesn't accumulate strangers' downloads.
+    PUBLIC_HISTORY_RETENTION_HOURS: int = 4
+    # Members (registered users, incl. admin): history kept longer and their
+    # download links/files survive for a few days so they can re-download.
+    MEMBER_HISTORY_RETENTION_DAYS: int = 30
+    MEMBER_DOWNLOAD_TTL_DAYS: int = 7
+    # How often the background cleanup sweep runs (seconds).
+    CLEANUP_INTERVAL_SECONDS: int = 600
+
+    # Self-service registration. When true, anyone with a valid invite code can
+    # register a member account. When false, only an admin can create members.
+    REGISTRATION_ENABLED: bool = True
+    # Require an invite code for self-registration (admins always create members
+    # without one). Turn off to allow open sign-ups.
+    REGISTRATION_REQUIRE_INVITE: bool = True
 
     # Per-IP daily quota for public/anonymous abuse protection.
     # 0 disables the per-IP limit.

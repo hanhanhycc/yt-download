@@ -15,9 +15,11 @@ from pathlib import Path
 from yt_dlp import YoutubeDL
 
 from app.config import settings
+from app.core.retention import download_token_ttl
 from app.core.security import generate_download_token
 from app.database import SessionLocal
 from app.models.job import DownloadJob, JobStatus
+from app.models.user import User
 from app.services.storage_service import user_dir
 from app.services.ytdlp_service import build_ydl_opts
 from app.workers.runner import clear_cancel, is_canceled
@@ -113,9 +115,11 @@ def run_download(job_id: int) -> None:
             job.thumbnail = info.get("thumbnail") or job.thumbnail
             job.duration_seconds = info.get("duration") or job.duration_seconds
             job.download_token = generate_download_token()
-            job.token_expires_at = datetime.now(timezone.utc) + timedelta(
-                seconds=settings.DOWNLOAD_TOKEN_TTL_SECONDS
-            )
+            # Members keep their download link for several days; anonymous
+            # public downloads get a short-lived token (the file is wiped right
+            # after the first download anyway).
+            owner = db.get(User, job.user_id)
+            job.token_expires_at = datetime.now(timezone.utc) + download_token_ttl(owner)
             job.status = JobStatus.COMPLETED
             job.progress = 100.0
             job.finished_at = datetime.now(timezone.utc)

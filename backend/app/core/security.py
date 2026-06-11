@@ -36,3 +36,11 @@ def decode_token(token: str) -> dict[str, Any]:
 
 def generate_download_token() -> str:
     return secrets.token_urlsafe(32)
+
+
+# Unambiguous alphabet (no 0/O/1/I) so codes are easy to read out / type.
+_INVITE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+
+def generate_invite_code(length: int = 10) -> str:
+    return "".join(secrets.choice(_INVITE_ALPHABET) for _ in range(length))

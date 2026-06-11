@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { login } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [u, setU] = useState("admin");
+  const [u, setU] = useState("");
   const [p, setP] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -75,9 +76,11 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-6 pt-4 border-t border-white/[0.06] text-xs text-white/40 text-center">
-          Tip: the bootstrap admin defaults to{" "}
-          <code className="text-white/70 bg-white/5 px-1.5 py-0.5 rounded">admin / admin</code>
+        <div className="mt-6 pt-4 border-t border-white/[0.06] text-sm text-white/50 text-center">
+          No account?{" "}
+          <Link href="/register" className="text-brand-light hover:underline underline-offset-4">
+            Sign up with an invite code
+          </Link>
         </div>
       </div>
     </div>

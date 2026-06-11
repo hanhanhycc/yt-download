@@ -96,6 +96,48 @@ export type Job = {
   finished_at?: string | null;
 };
 
+export type AppConfig = {
+  auth_required: boolean;
+  registration_enabled: boolean;
+  registration_require_invite: boolean;
+  public_history_retention_hours: number;
+  member_history_retention_days: number;
+  member_download_ttl_days: number;
+};
+
+export type Me = {
+  id: number;
+  username: string;
+  email?: string | null;
+  is_active: boolean;
+  is_admin: boolean;
+  created_at: string;
+};
+
+export type AdminUser = {
+  id: number;
+  username: string;
+  email?: string | null;
+  is_active: boolean;
+  is_admin: boolean;
+  created_at: string;
+  job_count: number;
+};
+
+export type Invite = {
+  id: number;
+  code: string;
+  max_uses: number;
+  used_count: number;
+  expires_at?: string | null;
+  created_at: string;
+  is_exhausted: boolean;
+};
+
+export async function getConfig() {
+  return api<AppConfig>("/api/config", { auth: false });
+}
+
 export async function login(username: string, password: string) {
   const form = new URLSearchParams();
   form.set("username", username);
@@ -115,6 +157,81 @@ export async function login(username: string, password: string) {
   const data = await res.json();
   setToken(data.access_token);
   return data;
+}
+
+export async function register(input: {
+  username: string;
+  password: string;
+  email?: string;
+  invite_code?: string;
+}) {
+  const data = await api<{ access_token: string }>("/api/auth/register", {
+    method: "POST",
+    auth: false,
+    body: JSON.stringify(input),
+  });
+  setToken(data.access_token);
+  return data;
+}
+
+export async function getMe() {
+  return api<Me>("/api/auth/me");
+}
+
+export async function changePassword(current_password: string, new_password: string) {
+  return api<void>("/api/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify({ current_password, new_password }),
+  });
+}
+
+// ---- Admin ----
+
+export async function adminListUsers() {
+  return api<AdminUser[]>("/api/admin/users");
+}
+
+export async function adminCreateUser(input: {
+  username: string;
+  password: string;
+  email?: string;
+  is_admin?: boolean;
+}) {
+  return api<AdminUser>("/api/admin/users", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function adminResetPassword(userId: number, new_password: string) {
+  return api<void>(`/api/admin/users/${userId}/reset-password`, {
+    method: "POST",
+    body: JSON.stringify({ new_password }),
+  });
+}
+
+export async function adminSetActive(userId: number, active: boolean) {
+  return api<AdminUser>(`/api/admin/users/${userId}/active?active=${active}`, {
+    method: "POST",
+  });
+}
+
+export async function adminListInvites() {
+  return api<Invite[]>("/api/admin/invites");
+}
+
+export async function adminCreateInvite(input: {
+  max_uses?: number;
+  expires_in_days?: number | null;
+}) {
+  return api<Invite>("/api/admin/invites", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function adminDeleteInvite(id: number) {
+  return api<void>(`/api/admin/invites/${id}`, { method: "DELETE" });
 }
 
 export async function fetchMetadata(url: string) {

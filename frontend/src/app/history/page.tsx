@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Job, deleteJob, listJobs } from "@/lib/api";
+import { AppConfig, Job, deleteJob, getConfig, getToken, listJobs } from "@/lib/api";
 import { detectPlatform } from "@/components/platforms";
 
 function fmtBytes(n?: number | null) {
@@ -33,6 +33,13 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
+  const [cfg, setCfg] = useState<AppConfig | null>(null);
+  const [loggedIn, setLoggedIn] = useState(false);
+
+  useEffect(() => {
+    setLoggedIn(!!getToken());
+    getConfig().then(setCfg).catch(() => {});
+  }, []);
 
   async function load() {
     setError(null);
@@ -84,7 +91,11 @@ export default function HistoryPage() {
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">History</h1>
           <p className="text-white/50 mt-1 text-sm">
-            All your downloads. Updates every 4 seconds.
+            {cfg
+              ? loggedIn
+                ? `Your downloads. History kept ${cfg.member_history_retention_days} days · download links kept ${cfg.member_download_ttl_days} days.`
+                : `Public history is cleared automatically every ${cfg.public_history_retention_hours} hours. Sign up to keep yours for ${cfg.member_history_retention_days} days.`
+              : "All your downloads. Updates every 4 seconds."}
           </p>
         </div>
         <div className="flex gap-2">

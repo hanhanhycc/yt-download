@@ -5,21 +5,31 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-
-def _admin_user(db: Session) -> Optional["User"]:
-    return (
-        db.query(User)
-        .filter(func.lower(User.username) == settings.ADMIN_USERNAME.strip().lower())
-        .first()
-    )
-
 from app.config import settings
 from app.core.security import decode_token
 from app.database import get_db
 from app.models.user import User
 
 
+# Reserved username for the single account that owns all anonymous/public
+# downloads. Created on boot (see main._bootstrap_users).
+PUBLIC_USERNAME = "__public__"
+
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
+
+
+def _admin_user(db: Session) -> Optional[User]:
+    return (
+        db.query(User)
+        .filter(func.lower(User.username) == settings.ADMIN_USERNAME.strip().lower())
+        .first()
+    )
+
+
+def get_public_user(db: Session) -> Optional[User]:
+    """The reserved anonymous account, or None if it hasn't been created yet."""
+    return db.query(User).filter(User.username == PUBLIC_USERNAME).first()
 
 
 def _user_from_token(token: str, db: Session) -> User:
@@ -40,18 +50,37 @@ def get_current_user(
     token: Annotated[Optional[str], Depends(oauth2_scheme)],
     db: Annotated[Session, Depends(get_db)],
 ) -> User:
-    # Open mode (AUTH_REQUIRED=false): no login needed; act as the admin user.
+    """Resolve the acting user.
+
+    1. A valid bearer token always wins — that's a logged-in member/admin.
+    2. Otherwise, in open mode (AUTH_REQUIRED=false) anonymous callers act as
+       the reserved public account (short-retention tier).
+    3. Otherwise authentication is required → 401.
+    """
+    if token:
+        return _user_from_token(token, db)
+
     if not settings.AUTH_REQUIRED:
+        public = get_public_user(db)
+        if public is not None:
+            return public
+        # Fall back to admin only if the public account somehow doesn't exist.
         admin = _admin_user(db)
         if admin is not None:
             return admin
-    if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    return _user_from_token(token, db)
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Not authenticated",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
+def get_current_member(user: Annotated[User, Depends(get_current_user)]) -> User:
+    """Require a real, logged-in member (not the anonymous public account)."""
+    if user.is_public:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Login required")
+    return user
 
 
 def get_current_admin(user: Annotated[User, Depends(get_current_user)]) -> User:

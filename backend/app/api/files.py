@@ -20,8 +20,10 @@ from sqlalchemy.orm import Session
 from starlette.background import BackgroundTask
 
 from app.config import settings
+from app.core.retention import as_utc, delete_file_after_download, safe_delete_file
 from app.database import SessionLocal, get_db
 from app.models.job import DownloadJob, JobStatus
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -35,25 +37,14 @@ def _cleanup_after_download(job_id: int, file_path: str) -> None:
     sent (or the client disconnects). Wrapped in broad try/except so a
     cleanup failure never bubbles back to the user — at worst it leaves
     a stray file behind to be removed manually.
-    """
-    try:
-        path = Path(file_path).resolve()
-        # Safety: only delete files that live inside the configured
-        # download root, never anywhere else on disk.
-        download_root = Path(settings.DOWNLOAD_DIR).resolve()
-        try:
-            path.relative_to(download_root)
-        except ValueError:
-            logger.warning("refusing to delete %s: outside DOWNLOAD_DIR", path)
-        else:
-            if path.is_file():
-                path.unlink()
-                logger.info("deleted %s after download (job %s)", path, job_id)
-    except Exception as exc:  # pragma: no cover - best-effort cleanup
-        logger.warning("file cleanup failed for job %s: %s", job_id, exc)
 
-    # Always clear the DB references so the link/history no longer offers
-    # the file for download.
+    Only runs for anonymous/public downloads; members keep their file (and
+    download link) until the 7-day retention sweep removes it.
+    """
+    if safe_delete_file(file_path):
+        logger.info("deleted %s after download (job %s)", file_path, job_id)
+
+    # Clear the DB references so the link/history no longer offers the file.
     db = SessionLocal()
     try:
         job = db.get(DownloadJob, job_id)
@@ -82,15 +73,9 @@ def download_file(
         raise HTTPException(status_code=409, detail="job not completed")
     if not job.download_token or token != job.download_token:
         raise HTTPException(status_code=403, detail="invalid token")
-    # SQLite stores DateTime(timezone=True) as naïve UTC; normalize before
-    # comparing so we don't crash with "can't compare offset-naive and
-    # offset-aware datetimes" (which surfaces as a 500 to the client).
-    expires_at = job.token_expires_at
-    if expires_at is not None:
-        if expires_at.tzinfo is None:
-            expires_at = expires_at.replace(tzinfo=timezone.utc)
-        if expires_at < datetime.now(timezone.utc):
-            raise HTTPException(status_code=410, detail="download token expired")
+    expires_at = as_utc(job.token_expires_at)
+    if expires_at is not None and expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=410, detail="download token expired")
     if not job.file_path:
         raise HTTPException(status_code=404, detail="file missing")
 
@@ -98,12 +83,17 @@ def download_file(
     if not path.exists() or not path.is_file():
         raise HTTPException(status_code=404, detail="file no longer on disk")
 
+    # Anonymous/public downloads are one-shot: the file is deleted and the
+    # token invalidated once the client finishes. Members keep their file and
+    # link until the 7-day retention sweep, so they can re-download.
+    owner = db.get(User, job.user_id)
+    background = None
+    if delete_file_after_download(owner):
+        background = BackgroundTask(_cleanup_after_download, job.id, str(path))
+
     return FileResponse(
         path=str(path),
         filename=path.name,
         media_type="application/octet-stream",
-        # Delete the file from the NAS and invalidate the token once the
-        # client has finished downloading (or has disconnected). The job
-        # row stays in history; the download link just becomes inactive.
-        background=BackgroundTask(_cleanup_after_download, job.id, str(path)),
+        background=background,
     )
