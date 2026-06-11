@@ -15,12 +15,20 @@ class UserCreate(UserBase):
 
 class UserRead(UserBase):
     id: int
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
     is_active: bool
     is_admin: bool
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+
+class ProfileUpdate(BaseModel):
+    first_name: Optional[str] = Field(default=None, max_length=120)
+    last_name: Optional[str] = Field(default=None, max_length=120)
+    email: Optional[EmailStr] = None
 
 
 class Token(BaseModel):
@@ -64,13 +72,28 @@ class AdminUserRead(BaseModel):
     id: int
     username: str
     email: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
     is_active: bool
     is_admin: bool
     created_at: datetime
     job_count: int = 0
+    last_download_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
+
+
+class AdminStats(BaseModel):
+    total_members: int
+    total_admins: int
+    total_invites_active: int
+    downloads_total: int
+    downloads_today: int
+    downloads_active: int
+    downloads_failed: int
+    storage_bytes: int
+    status_breakdown: dict[str, int]
 
 
 class InviteCreate(BaseModel):

@@ -65,6 +65,11 @@ def _migrate_schema() -> None:
                     text("ALTER TABLE users ADD COLUMN is_public BOOLEAN NOT NULL DEFAULT 0")
                 )
             logger.info("migrated: added users.is_public column")
+        for col in ("first_name", "last_name"):
+            if col not in user_cols:
+                with engine.begin() as conn:
+                    conn.execute(text(f"ALTER TABLE users ADD COLUMN {col} VARCHAR(120)"))
+                logger.info("migrated: added users.%s column", col)
     if "download_jobs" in tables:
         job_cols = {c["name"] for c in inspector.get_columns("download_jobs")}
         if "client_ip" not in job_cols:

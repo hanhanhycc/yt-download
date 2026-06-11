@@ -63,7 +63,8 @@ export function AuthNav() {
 function AccountMenu({ me }: { me: Me }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const initial = me.username.charAt(0).toUpperCase();
+  const displayName = me.first_name?.trim() || me.username;
+  const initial = displayName.charAt(0).toUpperCase();
 
   useEffect(() => {
     if (!open) return;
@@ -90,7 +91,7 @@ function AccountMenu({ me }: { me: Me }) {
         <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br from-brand to-brand-dark text-white text-xs font-semibold">
           {initial}
         </span>
-        <span className="text-sm font-medium max-w-[120px] truncate">{me.username}</span>
+        <span className="text-sm font-medium max-w-[120px] truncate">{displayName}</span>
         <svg
           viewBox="0 0 24 24"
           className={`w-3.5 h-3.5 text-white/40 transition-transform ${open ? "rotate-180" : ""}`}
@@ -110,9 +111,9 @@ function AccountMenu({ me }: { me: Me }) {
           className="absolute right-0 mt-2 w-56 rounded-xl border border-white/10 bg-[#0d0d16]/95 backdrop-blur-xl p-1.5 shadow-2xl shadow-black/60 animate-fade-up z-30"
         >
           <div className="px-3 py-2 border-b border-white/[0.06] mb-1">
-            <div className="text-sm font-medium truncate">{me.username}</div>
-            <div className="text-xs text-white/40">
-              {me.is_admin ? "Administrator" : "Member"}
+            <div className="text-sm font-medium truncate">{displayName}</div>
+            <div className="text-xs text-white/40 truncate">
+              {me.email || `@${me.username}`} · {me.is_admin ? "Administrator" : "Member"}
             </div>
           </div>
 

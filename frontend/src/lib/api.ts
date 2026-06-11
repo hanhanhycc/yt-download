@@ -112,6 +112,8 @@ export type Me = {
   id: number;
   username: string;
   email?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
   is_active: boolean;
   is_admin: boolean;
   created_at: string;
@@ -121,10 +123,25 @@ export type AdminUser = {
   id: number;
   username: string;
   email?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
   is_active: boolean;
   is_admin: boolean;
   created_at: string;
   job_count: number;
+  last_download_at?: string | null;
+};
+
+export type AdminStats = {
+  total_members: number;
+  total_admins: number;
+  total_invites_active: number;
+  downloads_total: number;
+  downloads_today: number;
+  downloads_active: number;
+  downloads_failed: number;
+  storage_bytes: number;
+  status_breakdown: Record<string, number>;
 };
 
 export type Invite = {
@@ -181,6 +198,17 @@ export async function getMe() {
   return api<Me>("/api/auth/me");
 }
 
+export async function updateProfile(input: {
+  first_name?: string | null;
+  last_name?: string | null;
+  email?: string | null;
+}) {
+  return api<Me>("/api/auth/me", {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
 export async function changePassword(current_password: string, new_password: string) {
   return api<void>("/api/auth/change-password", {
     method: "POST",
@@ -217,6 +245,20 @@ export async function adminSetActive(userId: number, active: boolean) {
   return api<AdminUser>(`/api/admin/users/${userId}/active?active=${active}`, {
     method: "POST",
   });
+}
+
+export async function adminSetRole(userId: number, isAdmin: boolean) {
+  return api<AdminUser>(`/api/admin/users/${userId}/role?is_admin=${isAdmin}`, {
+    method: "POST",
+  });
+}
+
+export async function adminDeleteUser(userId: number) {
+  return api<void>(`/api/admin/users/${userId}`, { method: "DELETE" });
+}
+
+export async function adminStats() {
+  return api<AdminStats>("/api/admin/stats");
 }
 
 export type AdminJob = {

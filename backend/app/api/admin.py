@@ -19,6 +19,7 @@ from app.schemas.auth import (
     AdminJobList,
     AdminJobRead,
     AdminResetPassword,
+    AdminStats,
     AdminUserCreate,
     AdminUserRead,
     InviteCreate,
@@ -34,14 +35,22 @@ def _serialize_user(db: Session, user: User) -> AdminUserRead:
         .filter(DownloadJob.user_id == user.id)
         .scalar()
     ) or 0
+    last_dl = (
+        db.query(func.max(DownloadJob.created_at))
+        .filter(DownloadJob.user_id == user.id)
+        .scalar()
+    )
     return AdminUserRead(
         id=user.id,
         username=user.username,
         email=user.email,
+        first_name=user.first_name,
+        last_name=user.last_name,
         is_active=user.is_active,
         is_admin=user.is_admin,
         created_at=user.created_at,
         job_count=int(job_count),
+        last_download_at=last_dl,
     )
 
 
@@ -114,6 +123,42 @@ def set_active(
     db.commit()
     db.refresh(user)
     return _serialize_user(db, user)
+
+
+@router.post("/users/{user_id}/role", response_model=AdminUserRead, summary="Grant/revoke admin")
+def set_role(
+    user_id: int,
+    is_admin: bool,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    user = db.get(User, user_id)
+    if not user or user.is_public:
+        raise HTTPException(status_code=404, detail="user not found")
+    if user.id == admin.id and not is_admin:
+        raise HTTPException(status_code=400, detail="You can't revoke your own admin role")
+    user.is_admin = is_admin
+    db.commit()
+    db.refresh(user)
+    return _serialize_user(db, user)
+
+
+@router.delete("/users/{user_id}", status_code=204, summary="Delete a member (and their jobs)")
+def delete_user(
+    user_id: int,
+    admin: Annotated[User, Depends(get_current_admin)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    user = db.get(User, user_id)
+    if not user or user.is_public:
+        raise HTTPException(status_code=404, detail="user not found")
+    if user.id == admin.id:
+        raise HTTPException(status_code=400, detail="You can't delete your own account")
+    # Their jobs cascade-delete; the next cleanup sweep removes any leftover
+    # files now that no row references them.
+    db.delete(user)
+    db.commit()
+    return None
 
 
 # ----- Invite codes -----
@@ -227,3 +272,67 @@ def list_all_jobs(
         for job, user in rows
     ]
     return AdminJobList(total=total, items=items)
+
+
+# ----- Dashboard stats -----
+
+@router.get("/stats", response_model=AdminStats, summary="Dashboard overview metrics")
+def stats(db: Annotated[Session, Depends(get_db)]):
+    members = (
+        db.query(func.count(User.id))
+        .filter(User.is_public.is_(False), User.is_admin.is_(False))
+        .scalar()
+    ) or 0
+    admins = (
+        db.query(func.count(User.id)).filter(User.is_admin.is_(True)).scalar()
+    ) or 0
+
+    invites_active = 0
+    for inv in db.query(InviteCode).all():
+        if inv.used_count >= inv.max_uses:
+            continue
+        expires_at = as_utc(inv.expires_at)
+        if expires_at is not None and expires_at < datetime.now(timezone.utc):
+            continue
+        invites_active += 1
+
+    downloads_total = db.query(func.count(DownloadJob.id)).scalar() or 0
+
+    # "Today" = since UTC midnight.
+    now = datetime.now(timezone.utc)
+    midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    downloads_today = (
+        db.query(func.count(DownloadJob.id))
+        .filter(DownloadJob.created_at >= midnight.replace(tzinfo=None))
+        .scalar()
+    ) or 0
+
+    status_breakdown: dict[str, int] = {}
+    for st, cnt in (
+        db.query(DownloadJob.status, func.count(DownloadJob.id))
+        .group_by(DownloadJob.status)
+        .all()
+    ):
+        key = st.value if hasattr(st, "value") else str(st)
+        status_breakdown[key] = int(cnt)
+
+    active = status_breakdown.get("pending", 0) + status_breakdown.get("running", 0)
+    failed = status_breakdown.get("failed", 0)
+
+    storage_bytes = (
+        db.query(func.coalesce(func.sum(DownloadJob.file_size), 0))
+        .filter(DownloadJob.file_path.isnot(None))
+        .scalar()
+    ) or 0
+
+    return AdminStats(
+        total_members=int(members),
+        total_admins=int(admins),
+        total_invites_active=invites_active,
+        downloads_total=int(downloads_total),
+        downloads_today=int(downloads_today),
+        downloads_active=int(active),
+        downloads_failed=int(failed),
+        storage_bytes=int(storage_bytes),
+        status_breakdown=status_breakdown,
+    )

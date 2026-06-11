@@ -14,6 +14,7 @@ from app.models.invite import InviteCode
 from app.models.user import User
 from app.schemas.auth import (
     ChangePasswordRequest,
+    ProfileUpdate,
     RegisterRequest,
     Token,
     UserRead,
@@ -108,6 +109,38 @@ def register(
 
 @router.get("/me", response_model=UserRead, summary="Current authenticated user")
 def me(user: Annotated[User, Depends(get_current_member)]):
+    return user
+
+
+@router.patch("/me", response_model=UserRead, summary="Update your profile")
+def update_profile(
+    payload: ProfileUpdate,
+    user: Annotated[User, Depends(get_current_member)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    data = payload.model_dump(exclude_unset=True)
+
+    if "email" in data:
+        email = data["email"]
+        if email:
+            clash = (
+                db.query(User)
+                .filter(func.lower(User.email) == email.lower(), User.id != user.id)
+                .first()
+            )
+            if clash is not None:
+                raise HTTPException(status_code=409, detail="Email already in use")
+        user.email = email or None
+
+    if "first_name" in data:
+        fn = (data["first_name"] or "").strip()
+        user.first_name = fn or None
+    if "last_name" in data:
+        ln = (data["last_name"] or "").strip()
+        user.last_name = ln or None
+
+    db.commit()
+    db.refresh(user)
     return user
 
 
