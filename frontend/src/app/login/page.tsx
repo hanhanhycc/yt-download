@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { login } from "@/lib/api";
+import { APP_NAME, MediaMark } from "@/components/brand";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -30,14 +31,11 @@ export default function LoginPage() {
     <div className="max-w-sm mx-auto mt-6">
       <div className="card animate-fade-up">
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-brand to-brand-dark shadow-lg shadow-brand/30 mb-3">
-            <svg viewBox="0 0 24 24" className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="11" width="18" height="11" rx="2" />
-              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-            </svg>
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-brand to-brand-dark text-white shadow-lg shadow-brand/30 mb-3">
+            <MediaMark className="w-6 h-6" />
           </div>
           <h1 className="text-xl font-semibold tracking-tight">Welcome back</h1>
-          <p className="text-sm text-white/50 mt-1">Sign in to your Loom account</p>
+          <p className="text-sm text-white/50 mt-1">Sign in to {APP_NAME}</p>
         </div>
 
         <form onSubmit={submit} className="space-y-4">

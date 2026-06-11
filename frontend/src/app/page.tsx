@@ -92,6 +92,35 @@ const DownloadIcon = () => (
     <path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 21h14" />
   </svg>
 );
+const ClipboardIcon = () => (
+  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="8" y="4" width="8" height="4" rx="1" /><path d="M9 4H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2" />
+  </svg>
+);
+const LinkIcon = () => (
+  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 15l6-6" /><path d="M11 7l1-1a3.5 3.5 0 0 1 5 5l-1 1" /><path d="M13 17l-1 1a3.5 3.5 0 0 1-5-5l1-1" />
+  </svg>
+);
+const CheckIcon = () => (
+  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m5 12 5 5L20 7" />
+  </svg>
+);
+
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function absoluteUrl(path: string) {
+  if (typeof window === "undefined") return path;
+  return path.startsWith("http") ? path : `${window.location.origin}${path}`;
+}
 
 export default function HomePage() {
   const [url, setUrl] = useState("");
@@ -104,6 +133,15 @@ export default function HomePage() {
   const esRef = useRef<EventSource | null>(null);
 
   useEffect(() => () => esRef.current?.close(), []);
+
+  async function onPaste() {
+    try {
+      const text = (await navigator.clipboard.readText()).trim();
+      if (text) setUrl(text);
+    } catch {
+      // Clipboard read blocked (no permission / insecure context) — ignore.
+    }
+  }
 
   async function onFetchMeta(e: React.FormEvent) {
     e.preventDefault();
@@ -206,17 +244,26 @@ export default function HomePage() {
               <SearchIcon />
             </div>
             <input
-              className="input !pl-10 !pr-36 !py-4 text-base"
+              className="input !pl-10 !pr-44 !py-4 text-base"
               placeholder="https://www.youtube.com/watch?v=…   or any link"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               autoFocus
             />
-            <div className="absolute inset-y-1.5 right-1.5">
+            <div className="absolute inset-y-1.5 right-1.5 flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={onPaste}
+                title="Paste from clipboard"
+                aria-label="Paste from clipboard"
+                className="btn-ghost h-full !px-3 focus-ring hidden sm:inline-flex"
+              >
+                <ClipboardIcon />
+              </button>
               <button
                 type="submit"
                 disabled={loading || !url.trim()}
-                className="btn-primary h-full px-5"
+                className="btn-primary h-full px-5 focus-ring"
               >
                 {loading ? (
                   <span className="flex items-center gap-2">
@@ -412,6 +459,15 @@ function JobProgressCard({ job }: { job: Job }) {
   const pct = Math.min(100, Math.max(0, job.progress || 0));
   const platform = detectPlatform(job.url);
   const isActive = job.status === "pending" || job.status === "running";
+  const [copied, setCopied] = useState(false);
+
+  async function onCopyLink() {
+    if (!job.download_url) return;
+    if (await copyToClipboard(absoluteUrl(job.download_url))) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    }
+  }
 
   const statusMeta = useMemo(() => {
     switch (job.status) {
@@ -505,9 +561,12 @@ function JobProgressCard({ job }: { job: Job }) {
 
       {job.status === "completed" && job.download_url && (
         <div className="mt-5 flex flex-wrap items-center gap-3">
-          <a className="btn-primary" href={job.download_url}>
+          <a className="btn-primary focus-ring" href={job.download_url}>
             <DownloadIcon /> Download file
           </a>
+          <button onClick={onCopyLink} className="btn-ghost focus-ring" type="button">
+            {copied ? <><CheckIcon /> Copied</> : <><LinkIcon /> Copy link</>}
+          </button>
           <span className="text-xs text-white/40">{fmtBytes(job.file_size)}</span>
         </div>
       )}

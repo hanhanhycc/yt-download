@@ -4,31 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AuthNav } from "@/components/auth-nav";
+import { Logo } from "@/components/brand";
 
 const LINKS = [
   { href: "/", label: "New", exact: true },
   { href: "/history", label: "History" },
 ];
-
-function Logo() {
-  return (
-    <Link href="/" className="flex items-center gap-2.5 group shrink-0">
-      <span className="relative inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-brand to-brand-dark shadow-lg shadow-brand/30 transition group-hover:shadow-brand/50">
-        <svg viewBox="0 0 24 24" className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 3v12" />
-          <path d="m7 10 5 5 5-5" />
-          <path d="M5 21h14" />
-        </svg>
-      </span>
-      <div className="leading-tight">
-        <div className="font-semibold tracking-tight">Loom</div>
-        <div className="hidden sm:block text-[10px] text-white/40 -mt-0.5 group-hover:text-white/60 transition">
-          self-hosted · yt-dlp
-        </div>
-      </div>
-    </Link>
-  );
-}
 
 function isActive(pathname: string, href: string, exact?: boolean) {
   if (exact) return pathname === href;

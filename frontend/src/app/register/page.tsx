@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getConfig, register } from "@/lib/api";
+import { APP_NAME, MediaMark } from "@/components/brand";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -48,14 +49,10 @@ export default function RegisterPage() {
     <div className="max-w-sm mx-auto mt-6">
       <div className="card animate-fade-up">
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-brand to-brand-dark shadow-lg shadow-brand/30 mb-3">
-            <svg viewBox="0 0 24 24" className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
-              <path d="M19 8v6M22 11h-6" />
-            </svg>
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-brand to-brand-dark text-white shadow-lg shadow-brand/30 mb-3">
+            <MediaMark className="w-6 h-6" />
           </div>
-          <h1 className="text-xl font-semibold tracking-tight">Create your account</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Join {APP_NAME}</h1>
           <p className="text-sm text-white/50 mt-1">
             Members keep history for 30 days and links for 7 days.
           </p>

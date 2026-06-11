@@ -144,9 +144,28 @@ export default function HistoryPage() {
   );
 }
 
+async function copyLink(path: string): Promise<boolean> {
+  try {
+    const url = path.startsWith("http") ? path : `${window.location.origin}${path}`;
+    await navigator.clipboard.writeText(url);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function JobRow({ job, onDelete }: { job: Job; onDelete: (id: number) => void }) {
   const platform = detectPlatform(job.url);
   const isActive = job.status === "running" || job.status === "pending";
+  const [copied, setCopied] = useState(false);
+
+  async function onCopy() {
+    if (!job.download_url) return;
+    if (await copyLink(job.download_url)) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    }
+  }
   const statusColor =
     job.status === "completed" ? "bg-emerald-400/15 text-emerald-300 border-emerald-400/30"
     : job.status === "failed" ? "bg-red-400/15 text-red-300 border-red-400/30"
@@ -213,13 +232,22 @@ function JobRow({ job, onDelete }: { job: Job; onDelete: (id: number) => void })
         </span>
         <div className="flex gap-2">
           {job.status === "completed" && job.download_url && (
-            <a className="btn-primary !py-1.5 !px-3 !text-xs" href={job.download_url}>
-              Download
-            </a>
+            <>
+              <a className="btn-primary !py-1.5 !px-3 !text-xs focus-ring" href={job.download_url}>
+                Download
+              </a>
+              <button
+                onClick={onCopy}
+                className="btn-ghost !py-1.5 !px-3 !text-xs focus-ring"
+                title="Copy download link"
+              >
+                {copied ? "Copied" : "Copy link"}
+              </button>
+            </>
           )}
           <button
             onClick={() => onDelete(job.id)}
-            className="btn-ghost !py-1.5 !px-3 !text-xs"
+            className="btn-ghost !py-1.5 !px-3 !text-xs focus-ring"
           >
             {isActive ? "Cancel" : "Delete"}
           </button>
