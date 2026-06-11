@@ -46,6 +46,14 @@ become **members**. A member's history is kept for
 survive for `MEMBER_DOWNLOAD_TTL_DAYS` (default 7) days before the background
 cleanup sweep removes them.
 
+The same cleanup sweep also removes **orphan files** — anything left in the
+download folder that no job references anymore (a download that failed or was
+canceled and left a `.part` file, or a file whose delete-on-download failed).
+Only files older than `ORPHAN_FILE_GRACE_HOURS` (default 2) are removed, so an
+in-progress download is never touched. So a completed-but-never-clicked download
+still goes away on its own: anonymous ones clear within 4 hours, members keep
+theirs for the 7-day re-download window, and any untracked leftover is swept up.
+
 The bootstrap **admin** (`admin` / `admin123` by default — change it!) can,
 from the **Admin** page in the UI:
 
@@ -155,6 +163,7 @@ Cookies expire — refresh them when the bot check returns.
 | `PUBLIC_HISTORY_RETENTION_HOURS` | Anonymous history auto-clear window (default 4) |
 | `MEMBER_HISTORY_RETENTION_DAYS`  | Member history retention (default 30)   |
 | `MEMBER_DOWNLOAD_TTL_DAYS`       | Member download-link lifetime (default 7) |
+| `ORPHAN_FILE_GRACE_HOURS`        | Untracked-file sweep grace window (default 2) |
 | `REGISTRATION_ENABLED`  | Allow self sign-up                               |
 | `REGISTRATION_REQUIRE_INVITE` | Require an invite code to self-register    |
 | `YTDLP_COOKIES_B64`     | base64 cookies.txt for YouTube                   |

@@ -64,6 +64,12 @@ class Settings(BaseSettings):
     MEMBER_DOWNLOAD_TTL_DAYS: int = 7
     # How often the background cleanup sweep runs (seconds).
     CLEANUP_INTERVAL_SECONDS: int = 600
+    # The cleanup sweep also removes "orphan" files in DOWNLOAD_DIR that no job
+    # references anymore (a download that failed/was canceled and left a .part
+    # file, or a file whose delete-on-download failed). Only files older than
+    # this grace window are removed, so an in-progress download is never touched
+    # (downloads can't outlive JOB_TIMEOUT_SECONDS anyway).
+    ORPHAN_FILE_GRACE_HOURS: int = 2
 
     # Self-service registration. When true, anyone with a valid invite code can
     # register a member account. When false, only an admin can create members.

@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 import threading
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from sqlalchemy.orm import Session
 
@@ -73,20 +74,73 @@ def run_cleanup_once(db: Session) -> dict[str, int]:
 
     if rows_deleted or files_deleted or links_expired:
         db.commit()
+    else:
+        db.rollback()
+
+    # After per-job cleanup, sweep any file on disk that no surviving job
+    # references (failed/canceled downloads, leftover .part files, or a
+    # delete-on-download that failed and nulled file_path but left the file).
+    orphans_deleted = _sweep_orphan_files(db, now)
+
+    if rows_deleted or files_deleted or links_expired or orphans_deleted:
         logger.info(
-            "cleanup: removed %d rows, %d files, expired %d links",
+            "cleanup: removed %d rows, %d files, expired %d links, %d orphan files",
             rows_deleted,
             files_deleted,
             links_expired,
+            orphans_deleted,
         )
-    else:
-        db.rollback()
 
     return {
         "rows_deleted": rows_deleted,
         "files_deleted": files_deleted,
         "links_expired": links_expired,
+        "orphans_deleted": orphans_deleted,
     }
+
+
+def _sweep_orphan_files(db: Session, now: datetime) -> int:
+    """Delete files under DOWNLOAD_DIR that no job references and that are
+    older than the grace window (so an in-progress download is never hit).
+    """
+    root = Path(settings.DOWNLOAD_DIR)
+    if not root.exists():
+        return 0
+
+    # Absolute paths still referenced by some job row.
+    referenced: set[Path] = set()
+    for (fp,) in db.query(DownloadJob.file_path).filter(DownloadJob.file_path.isnot(None)).all():
+        if fp:
+            try:
+                referenced.add(Path(fp).resolve())
+            except Exception:
+                continue
+
+    grace = timedelta(hours=max(0, settings.ORPHAN_FILE_GRACE_HOURS))
+    deleted = 0
+    try:
+        candidates = list(root.rglob("*"))
+    except Exception as exc:  # pragma: no cover - infra
+        logger.warning("orphan sweep: could not list %s: %s", root, exc)
+        return 0
+
+    for path in candidates:
+        try:
+            if not path.is_file():
+                continue
+            if path.resolve() in referenced:
+                continue
+            mtime = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+            if now - mtime < grace:
+                # Recently written — likely an active download. Leave it.
+                continue
+            path.unlink()
+            deleted += 1
+            logger.info("orphan sweep: deleted untracked file %s", path)
+        except Exception as exc:  # pragma: no cover - best-effort
+            logger.warning("orphan sweep: could not handle %s: %s", path, exc)
+
+    return deleted
 
 
 def _loop() -> None:
